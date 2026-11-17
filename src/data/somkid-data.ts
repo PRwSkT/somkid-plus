@@ -60,19 +60,57 @@ export interface StudentOutcome {
   quote: string;
 }
 
+export interface TrackDimensionDef {
+  key: string;
+  label: string;
+  shortLabel: string;
+  englishLabel: string;
+  description: string;
+  benchmarkPercent: number;
+  strengthAdvice: string;
+  focusAdvice: string;
+}
+
 export type SkillDimensionKey =
   | "conceptual"
   | "applied"
   | "logic"
   | "accuracy"
-  | "expression";
+  | "expression"
+  | "spatial"
+  | "grammar"
+  | "vocab"
+  | "reading"
+  | "communication"
+  | "cohesion"
+  | "inquiry"
+  | "physics"
+  | "chemistry"
+  | "biology"
+  | "data_applied"
+  | string;
 
-export const SKILL_DIMENSION_LABELS: Record<SkillDimensionKey, string> = {
+export const SKILL_DIMENSION_LABELS: Record<string, string> = {
+  // Legacy / General
   conceptual: "ความเข้าใจแนวคิด",
-  applied: "การวิเคราะห์โจทย์ประยุกต์",
-  logic: "ตรรกะและลำดับความคิด",
-  accuracy: "ความแม่นยำและการบริหารเวลา",
-  expression: "การสื่อสารและการตีความ",
+  applied: "การประยุกต์และแก้โจทย์",
+  logic: "ตรรกะและแบบรูป",
+  accuracy: "ความแม่นยำและการคำนวณ",
+  expression: "การสื่อสารและตีความ",
+  // Mathematics
+  spatial: "เรขาคณิตและมิติสัมพันธ์",
+  // English MEP
+  grammar: "ไวยากรณ์และโครงสร้าง",
+  vocab: "คำศัพท์เชิงวิชาการ",
+  reading: "การอ่านจับใจความและอนุมาน",
+  communication: "การสื่อสารเชิงสถานการณ์",
+  cohesion: "การเชื่อมโยงและตรรกะภาษา",
+  // Inquiry Science
+  inquiry: "กระบวนการสืบเสาะและการวัด",
+  physics: "ฟิสิกส์ แรงและพลังงาน",
+  chemistry: "เคมีและสมบัติของสาร",
+  biology: "ชีววิทยาและสิ่งมีชีวิต",
+  data_applied: "การคำนวณและการแปลผลวิทย์",
 };
 
 export type QuestionType =
@@ -118,6 +156,7 @@ export interface MockExamTrack {
   gradeLabel: string;
   durationMinutes: number;
   description: string;
+  dimensions: TrackDimensionDef[];
   questions: MockQuestion[];
 }
 
@@ -361,6 +400,58 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
     gradeLabel: "ประถมปลาย",
     durationMinutes: 15,
     description: "ประเมินความเข้าใจเศษส่วน ร้อยละ เรขาคณิต โจทย์ปัญหาประยุกต์ และตรรกะเชิงตัวเลข 12 ข้อ",
+    dimensions: [
+      {
+        key: "conceptual",
+        label: "มโนทัศน์และจำนวน",
+        shortLabel: "มโนทัศน์",
+        englishLabel: "Number & Concept",
+        description: "ความเข้าใจเชิงมโนทัศน์ในเรื่องเศษส่วน ทศนิยม และการดำเนินการทางคณิตศาสตร์",
+        benchmarkPercent: 70,
+        strengthAdvice: "มีความเข้าใจมโนทัศน์พื้นฐานและค่าประจำหลักของตัวเลขอย่างแม่นยำ ไม่สับสนกับนิยาม",
+        focusAdvice: "ควรทบทวนความหมายเชิงภาพ (Pictorial) ของเศษส่วนและการแปลงรูปทศนิยม เพื่อสร้างฐานความเข้าใจที่แน่นหนา",
+      },
+      {
+        key: "applied",
+        label: "การแก้โจทย์ปัญหาประยุกต์",
+        shortLabel: "โจทย์ประยุกต์",
+        englishLabel: "Problem Solving & Modeling",
+        description: "ทักษะการแปลความหมายโจทย์หลายขั้นตอน บาร์โมเดล อัตราส่วนและร้อยละ",
+        benchmarkPercent: 70,
+        strengthAdvice: "สามารถวิเคราะห์โจทย์ปัญหาในชีวิตประจำวันและจำลองเป็นสมการได้อย่างเป็นระบบ",
+        focusAdvice: "ฝึกวาด Bar Model หรือแยกสิ่งที่โจทย์บอกและสิ่งที่โจทย์ถามทีละขั้น เพื่อป้องกันการตีความคลาดเคลื่อน",
+      },
+      {
+        key: "logic",
+        label: "ตรรกะและแบบรูป",
+        shortLabel: "ตรรกะตัวเลข",
+        englishLabel: "Numerical Logic & Patterns",
+        description: "การหาความสัมพันธ์ของลำดับตัวเลข ค.ร.น. ห.ร.ม. และการให้เหตุผลเชิงคณิตศาสตร์",
+        benchmarkPercent: 75,
+        strengthAdvice: "มีไหวพริบในการมองหาแบบรูปและเชื่อมโยงตรรกะทางคณิตศาสตร์ได้รวดเร็ว",
+        focusAdvice: "ฝึกสังเกตอัตราการเพิ่ม-ลดของชุดตัวเลขและการจับคู่ความสัมพันธ์ของโจทย์แบบมีเงื่อนไข",
+      },
+      {
+        key: "accuracy",
+        label: "ความแม่นยำและการคำนวณ",
+        shortLabel: "ความแม่นยำ",
+        englishLabel: "Computational Precision",
+        description: "ความถูกต้องแม่นยำในการคิดเลข ลำดับการคำนวณ และการบริหารเวลา",
+        benchmarkPercent: 75,
+        strengthAdvice: "คิดเลขได้แม่นยำ มีสมาธิและระมัดระวังในการคำนวณลำดับเครื่องหมาย",
+        focusAdvice: "หมั่นตรวจทานคำตอบย้อนกลับ และระวังลำดับการคำนวณที่มีทั้งการคูณ หาร และบวกลบผสมกัน",
+      },
+      {
+        key: "spatial",
+        label: "เรขาคณิตและมิติสัมพันธ์",
+        shortLabel: "เรขาคณิต",
+        englishLabel: "Spatial & Geometry",
+        description: "การคำนวณพื้นที่ เส้นรอบรูป มุม และการมองภาพรูปทรงเรขาคณิต",
+        benchmarkPercent: 70,
+        strengthAdvice: "มองภาพโครงสร้างเรขาคณิตได้ชัดเจนและใช้สูตรคำนวณพื้นที่ได้อย่างถูกต้อง",
+        focusAdvice: "ฝึกจินตนาการการประกอบและแยกชิ้นส่วนของรูปหลายเหลี่ยม รวมถึงระวังหน่วยวัดพื้นที่",
+      },
+    ],
     questions: [
       {
         id: "m1",
@@ -401,7 +492,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "m5",
-        dimension: "expression",
+        dimension: "spatial",
         prompt: "สี่เหลี่ยมผืนผ้ารูปหนึ่งมีด้านยาวยาวกว่าด้านกว้าง 4 ซม. และมีเส้นรอบรูป 36 ซม. ด้านกว้างยาวกี่ซม.",
         options: ["6 ซม.", "7 ซม.", "8 ซม.", "11 ซม."],
         correctIndex: 1,
@@ -442,7 +533,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
         diagramType: "geometry_triangle",
         topic: "เรขาคณิตและพื้นที่",
         difficulty: "foundation",
-        dimension: "accuracy",
+        dimension: "spatial",
         prompt: "จากรูปสามเหลี่ยมมุมฉากในแผนภาพด้านบน มีความยาวฐาน 14 ซม. และความสูง 9 ซม. คำนวณพื้นที่จากสูตร $\\frac{1}{2} \\times \\text{ฐาน} \\times \\text{สูง}$ ได้ผลลัพธ์ตรงกับข้อใด",
         options: ["54 ตร.ซม.", "63 ตร.ซม.", "72 ตร.ซม.", "126 ตร.ซม."],
         correctIndex: 1,
@@ -451,7 +542,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "m10",
-        dimension: "expression",
+        dimension: "applied",
         prompt: "อัตราส่วนของนักเรียนชายต่อนักเรียนหญิงเป็น 5 : 7 ถ้ามีนักเรียนทั้งหมด 48 คน มีนักเรียนหญิงมากกว่าชายกี่คน",
         options: ["4 คน", "6 คน", "8 คน", "12 คน"],
         correctIndex: 2,
@@ -459,7 +550,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "m11",
-        dimension: "applied",
+        dimension: "accuracy",
         prompt: "รถยนต์วิ่งด้วยความเร็วเฉลี่ย 75 กม./ชม. เป็นเวลา 2 ชั่วโมง 24 นาที จะได้ระยะทางกี่กิโลเมตร",
         options: ["165 กม.", "175 กม.", "180 กม.", "190 กม."],
         correctIndex: 2,
@@ -487,10 +578,62 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
     gradeLabel: "ป.5 – ม.2",
     durationMinutes: 15,
     description: "วัดระดับโครงสร้างประโยค คำศัพท์เชิงบริบท การอ่านจับใจความ และตรรกะการสื่อสารภาษาอังกฤษ 12 ข้อ",
+    dimensions: [
+      {
+        key: "grammar",
+        label: "ไวยากรณ์และโครงสร้าง",
+        shortLabel: "ไวยากรณ์",
+        englishLabel: "Grammar & Structure",
+        description: "ความแม่นยำในกฎไวยากรณ์ Subject-Verb Agreement, Passive Voice, Conditionals และ Tenses",
+        benchmarkPercent: 70,
+        strengthAdvice: "แม่นยำในโครงสร้างประโยคซับซ้อนและการผันกริยาตามประธานได้อย่างถูกต้อง",
+        focusAdvice: "ควรทบทวนกฎข้อยกเว้นทางไวยากรณ์ เช่น Subject-Verb Agreement เมื่อมี neither...nor หรือโครงสร้าง Subjunctive",
+      },
+      {
+        key: "vocab",
+        label: "คำศัพท์เชิงวิชาการและบริบท",
+        shortLabel: "คำศัพท์",
+        englishLabel: "Academic Vocabulary",
+        description: "ความรู้คำศัพท์ระดับสูงที่ใช้ในข้อสอบวิชาการและการคาดเดาความหมายจากบริบท",
+        benchmarkPercent: 70,
+        strengthAdvice: "มีคลังคำศัพท์วิชาการที่กว้างขวาง สามารถตีความศัพท์ระดับมัธยมได้อย่างเฉียบคม",
+        focusAdvice: "ขยายคลังคำศัพท์เชิงวิชาการ (Academic Word List) และฝึกเดาความหมายจากรากศัพท์หรือประโยคแวดล้อม",
+      },
+      {
+        key: "reading",
+        label: "การอ่านจับใจความและอนุมาน",
+        shortLabel: "การอ่าน",
+        englishLabel: "Reading & Inference",
+        description: "การวิเคราะห์ข้อความ จับประเด็นหลัก และการอนุมานเจตนาของผู้เขียน",
+        benchmarkPercent: 70,
+        strengthAdvice: "สามารถจับใจความสำคัญของบทความยาวและแยกแยะข้อเท็จจริงออกจากความคิดเห็นได้ดี",
+        focusAdvice: "ฝึกอ่านบทความเชิงวิเคราะห์และสังเกตคำเชื่อมที่แสดงความขัดแย้ง (เช่น Although, However) เพื่อจับประเด็นแท้จริง",
+      },
+      {
+        key: "communication",
+        label: "การสื่อสารเชิงสถานการณ์",
+        shortLabel: "การสื่อสาร",
+        englishLabel: "Situational Communication",
+        description: "ความคล่องตัวในการเลือกใช้ภาษาที่สุภาพและเหมาะสมตามบริบทสังคมและบทสนทนา",
+        benchmarkPercent: 75,
+        strengthAdvice: "เข้าใจวัฒนธรรมการใช้ภาษาและตอบสนองต่อบทสนทนาได้อย่างเป็นธรรมชาติและสุภาพ",
+        focusAdvice: "ฝึกใช้สำนวนภาษาพูดที่เป็นธรรมชาติในห้องเรียน MEP เช่น การขออนุญาตหรือการปฏิเสธอย่างสุภาพ",
+      },
+      {
+        key: "cohesion",
+        label: "การเชื่อมโยงและตรรกะภาษา",
+        shortLabel: "ตรรกะภาษา",
+        englishLabel: "Linguistic Cohesion & Tone",
+        description: "การใช้คำเชื่อมแสดงเหตุผล (Cohesive Devices) และการเลือกน้ำเสียงที่เหมาะสมกับงานวิชาการ",
+        benchmarkPercent: 70,
+        strengthAdvice: "เข้าใจลำดับการเรียบเรียงความคิดและเลือกใช้น้ำเสียงที่เป็นกลางแบบวิชาการได้ยอดเยี่ยม",
+        focusAdvice: "ฝึกการใช้คำเชื่อมบอกเหตุผลและผลลัพธ์ (เช่น Consequently, Furthermore) เพื่อให้การเขียนเชื่อมโยงอย่างลื่นไหล",
+      },
+    ],
     questions: [
       {
         id: "e1",
-        dimension: "conceptual",
+        dimension: "grammar",
         prompt: "Choose the grammatically correct sentence:",
         options: [
           "Neither the teacher nor the students was late.",
@@ -503,7 +646,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "e2",
-        dimension: "expression",
+        dimension: "vocab",
         prompt: "In an experiment, the data was 'ambiguous'. What does 'ambiguous' mean?",
         options: [
           "Completely accurate and proven",
@@ -516,7 +659,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "e3",
-        dimension: "applied",
+        dimension: "grammar",
         prompt: "If she ______ earlier yesterday, she wouldn't have missed the morning briefing.",
         options: ["arrives", "arrived", "had arrived", "would arrive"],
         correctIndex: 2,
@@ -527,7 +670,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
         type: "single_choice",
         topic: "Reading Comprehension",
         difficulty: "intermediate",
-        dimension: "logic",
+        dimension: "reading",
         contextPassage: "Although solar panels reduce monthly electricity bills in the long run, their initial installation cost remains a major barrier for small schools with limited budgets. Many school administrators are now exploring government clean-energy subsidy grants to help bridge the funding gap.",
         prompt: "Based on the passage above, what is the author's primary argument regarding solar panels in small schools?",
         options: [
@@ -545,7 +688,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
         type: "true_false",
         topic: "Fact-Checking from Passage",
         difficulty: "foundation",
-        dimension: "accuracy",
+        dimension: "reading",
         prompt: "From the solar panel passage, evaluate this statement: 'Small schools struggle with solar panels because solar technology does not reduce electricity bills.' (True or False)",
         options: ["True", "False"],
         correctIndex: 1,
@@ -554,7 +697,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "e6",
-        dimension: "conceptual",
+        dimension: "grammar",
         prompt: "Which sentence uses the passive voice correctly?",
         options: [
           "The bridge was designing by a young engineer.",
@@ -567,7 +710,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "e7",
-        dimension: "expression",
+        dimension: "cohesion",
         prompt: "Which transition word best fits? 'The team practiced every afternoon; ______, they won first place in the regional debate.'",
         options: ["however", "consequently", "meanwhile", "nevertheless"],
         correctIndex: 1,
@@ -575,7 +718,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "e8",
-        dimension: "applied",
+        dimension: "communication",
         prompt: "Choose the best response when a classmate says: 'Would you mind if I borrowed your lab notebook?'",
         options: [
           "Yes, please take it.",
@@ -591,7 +734,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
         type: "multiple_choice",
         topic: "Grammar & Error Identification",
         difficulty: "challenge",
-        dimension: "accuracy",
+        dimension: "grammar",
         prompt: "Which TWO of the following sentences contain grammatical errors? (Select 2 options)",
         options: [
           "Every students in the robotics club needs to bring their own laptop.",
@@ -605,7 +748,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "e10",
-        dimension: "logic",
+        dimension: "vocab",
         prompt: "If a museum exhibit is described as 'ephemeral', how long does it last?",
         options: [
           "For centuries",
@@ -618,7 +761,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "e11",
-        dimension: "conceptual",
+        dimension: "grammar",
         prompt: "Complete the sentence: 'The coach insisted that every player ______ on time for warm-up.'",
         options: ["is", "be", "was", "to be"],
         correctIndex: 1,
@@ -626,7 +769,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "e12",
-        dimension: "expression",
+        dimension: "cohesion",
         prompt: "Which headline sounds most objective and academic?",
         options: [
           "Amazing Kids Smash Math Test!",
@@ -647,10 +790,62 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
     gradeLabel: "มัธยมต้น",
     durationMinutes: 15,
     description: "วัดความเข้าใจทักษะกระบวนการทางวิทยาศาสตร์ ฟิสิกส์ เคมี และชีววิทยาเชิงวิเคราะห์ 12 ข้อ",
+    dimensions: [
+      {
+        key: "inquiry",
+        label: "กระบวนการสืบเสาะและการวัด",
+        shortLabel: "ทักษะสืบเสาะ",
+        englishLabel: "Scientific Inquiry",
+        description: "การระบุตัวแปร การออกแบบการทดลอง และทักษะการอ่านค่าอุปกรณ์วัดในห้องแล็บ",
+        benchmarkPercent: 70,
+        strengthAdvice: "มีทักษะกระบวนการทางวิทยาศาสตร์ที่ดี เข้าใจการควบคุมตัวแปรและอ่านเครื่องมือวัดได้ถูกต้อง",
+        focusAdvice: "ควรฝึกแยกแยะระหว่างตัวแปรต้น ตัวแปรตาม และตัวแปรควบคุมในการทดลองต่างๆ ให้แม่นยำยิ่งขึ้น",
+      },
+      {
+        key: "physics",
+        label: "ฟิสิกส์ แรงและพลังงาน",
+        shortLabel: "ฟิสิกส์",
+        englishLabel: "Physics & Mechanics",
+        description: "ความเข้าใจเรื่องแรง การเคลื่อนที่ วงจรไฟฟ้า คลื่นเสียง และพลังงาน",
+        benchmarkPercent: 70,
+        strengthAdvice: "เข้าใจกฎฟิสิกส์พื้นฐานและสามารถนำทฤษฎีมาอธิบายปรากฏการณ์รอบตัวได้อย่างเป็นเหตุเป็นผล",
+        focusAdvice: "ทบทวนเรื่องวงจรไฟฟ้า (วงจรเปิด-ปิด) และสมบัติของคลื่นกลที่ต้องอาศัยตัวกลางในการส่งผ่านพลังงาน",
+      },
+      {
+        key: "chemistry",
+        label: "เคมีและสมบัติของสาร",
+        shortLabel: "เคมี",
+        englishLabel: "Chemistry & Matter",
+        description: "การเปลี่ยนแปลงทางกายภาพและเคมี สมบัติสารละลาย สารบริสุทธิ์ และแก๊สในบรรยากาศ",
+        benchmarkPercent: 70,
+        strengthAdvice: "แยกแยะการเปลี่ยนแปลงทางเคมีกับทางกายภาพได้ชัดเจน และเข้าใจองค์ประกอบของสารรอบตัว",
+        focusAdvice: "เน้นย้ำเกณฑ์การเกิดสารใหม่ในปฏิกิริยาเคมี และทบทวนความหนาแน่นกับการจัดเรียงตัวของโมเลกุลสาร",
+      },
+      {
+        key: "biology",
+        label: "ชีววิทยาและสิ่งมีชีวิต",
+        shortLabel: "ชีววิทยา",
+        englishLabel: "Biology & Life Systems",
+        description: "โครงสร้างและหน้าที่ของเซลล์ ออร์แกเนลล์ การสังเคราะห์ด้วยแสง และการดำรงชีวิตของพืชและสัตว์",
+        benchmarkPercent: 70,
+        strengthAdvice: "เข้าใจกลไกการทำงานของเซลล์และกระบวนการแปลงพลังงานในสิ่งมีชีวิตได้อย่างถูกต้อง",
+        focusAdvice: "ทบทวนหน้าที่เฉพาะของออร์แกเนลล์สำคัญ เช่น ไมโทคอนเดรียและคลอโรพลาสต์ และสมการการสังเคราะห์ด้วยแสง",
+      },
+      {
+        key: "data_applied",
+        label: "การคำนวณและการแปลผลวิทย์",
+        shortLabel: "การคำนวณวิทย์",
+        englishLabel: "Scientific Modeling & Math",
+        description: "การประยุกต์สูตรทางวิทยาศาสตร์ ($F=ma$, $D=m/V$, $V=IR$) และการแปลผลตัวเลข",
+        benchmarkPercent: 70,
+        strengthAdvice: "มีความสามารถในการคำนวณและแทนค่าในสูตรวิทยาศาสตร์ได้อย่างคล่องแคล่วและแม่นยำ",
+        focusAdvice: "ฝึกการแปลงหน่วยทางฟิสิกส์และการย้ายข้างสมการในการคำนวณความหนาแน่นและกฎของโอห์ม",
+      },
+    ],
     questions: [
       {
         id: "s1",
-        dimension: "conceptual",
+        dimension: "inquiry",
         prompt: "ในการทดลองเปรียบเทียบการเจริญเติบโตของพืชที่ได้รับแสงสีต่างกัน ตัวแปรต้น (Independent Variable) คือข้อใด",
         options: ["ความสูงของต้นพืช", "สีของแสงที่ให้", "ปริมาณน้ำที่รด", "ชนิดของดิน"],
         correctIndex: 1,
@@ -661,7 +856,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
         type: "numeric_input",
         topic: "ฟิสิกส์ แรงและการเคลื่อนที่",
         difficulty: "intermediate",
-        dimension: "applied",
+        dimension: "physics",
         prompt: "วัตถุมวล $m = 4\\text{ kg}$ ถูกแรงลัพธ์ $\\Sigma F = 20\\text{ N}$ กระทำในแนวราบ ตามกฎการเคลื่อนที่ข้อ 2 ของนิวตัน $(\\Sigma F = ma)$ วัตถุจะเคลื่อนที่ด้วยความเร่งกี่ $\\text{m/s}^2$ (พิมพ์คำตอบเป็นตัวเลข)",
         unit: "m/s²",
         correctAnswer: "5",
@@ -671,7 +866,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "s3",
-        dimension: "conceptual",
+        dimension: "biology",
         prompt: "ออร์แกเนลล์ใดในเซลล์พืชที่ทำหน้าที่สร้างพลังงาน (ATP) จากการหายใจระดับเซลล์",
         options: ["คลอโรพลาสต์", "ไมโทคอนเดรีย", "กอลจิบอดี", "แวคิวโอล"],
         correctIndex: 1,
@@ -683,7 +878,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
         diagramType: "science_beaker",
         topic: "ทักษะปฏิบัติการและการวัด",
         difficulty: "foundation",
-        dimension: "accuracy",
+        dimension: "inquiry",
         prompt: "สังเกตระดับของเหลวในกระบอกตวงจากแผนภาพด้านบน โดยอ่านค่าที่ท้องคลื่นของเหลว (Meniscus) ปริมาตรของสารละลายนี้คือเท่าใด",
         options: ["60 ml", "65 ml", "68 ml", "70 ml"],
         correctIndex: 1,
@@ -696,7 +891,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
         diagramType: "circuit",
         topic: "ฟิสิกส์ วงจรไฟฟ้า",
         difficulty: "foundation",
-        dimension: "logic",
+        dimension: "physics",
         prompt: "จากแผนผังวงจรไฟฟ้าด้านบน หากสวิตช์ยังอยู่ในสถานะ 'สวิตช์เปิด (Open)' หลอดไฟจะทำงานอย่างไร",
         options: [
           "หลอดไฟดับ เพราะวงจรเปิด กระแสไฟฟ้าไหลไม่ครบวงจร",
@@ -710,7 +905,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "s6",
-        dimension: "expression",
+        dimension: "chemistry",
         prompt: "เหตุใดน้ำแข็งจึงลอยบนผิวน้ำเหลวได้",
         options: [
           "น้ำแข็งไม่มีมวล",
@@ -723,7 +918,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "s7",
-        dimension: "applied",
+        dimension: "data_applied",
         prompt: "โลหะก้อนหนึ่งมีมวล 54 กรัม และมีปริมาตร 20 ลูกบาศก์เซนติเมตร ความหนาแน่นของโลหะนี้คือเท่าใด",
         options: ["0.37 g/cm³", "2.7 g/cm³", "3.4 g/cm³", "10.8 g/cm³"],
         correctIndex: 1,
@@ -731,7 +926,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "s8",
-        dimension: "conceptual",
+        dimension: "chemistry",
         prompt: "แก๊สชนิดใดเป็นองค์ประกอบหลักที่มีสัดส่วนมากที่สุดในบรรยากาศโลก (~78%)",
         options: ["ออกซิเจน", "คาร์บอนไดออกไซด์", "ไนโตรเจน", "อาร์กอน"],
         correctIndex: 2,
@@ -739,7 +934,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "s9",
-        dimension: "logic",
+        dimension: "biology",
         prompt: "ในการสังเคราะห์ด้วยแสงของพืช พลังงานแสงถูกเปลี่ยนไปเป็นพลังงานรูปแบบใด",
         options: ["พลังงานกล", "พลังงานเคมีในรูปน้ำตาล", "พลังงานความร้อน", "พลังงานแม่เหล็ก"],
         correctIndex: 1,
@@ -747,7 +942,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "s10",
-        dimension: "accuracy",
+        dimension: "chemistry",
         prompt: "การเปลี่ยนแปลงใดต่อไปนี้เป็นการเปลี่ยนแปลงทางเคมี (Chemical Change)",
         options: [
           "การหลอมเหลวของเทียนไข",
@@ -760,7 +955,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "s11",
-        dimension: "expression",
+        dimension: "physics",
         prompt: "ทำไมนักบินอวกาศบนสถานีอวกาศจึงไม่สามารถได้ยินเสียงเคาะภายนอกยานโดยตรงในสุญญากาศ",
         options: [
           "เสียงเดินทางช้าเกินไปในอวกาศ",
@@ -773,7 +968,7 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "s12",
-        dimension: "applied",
+        dimension: "data_applied",
         prompt: "ถ้าความต่างศักย์คร่อมตัวต้านทาน $R = 6\\ \\Omega$ มีค่า $V = 12\\text{ V}$ คำนวณกระแสไฟฟ้า $I = \\frac{V}{R}$ ที่ไหลผ่านตัวต้านทานนี้ได้กี่แอมแปร์ (A)",
         options: ["0.5 A", "2 A", "6 A", "72 A"],
         correctIndex: 1,

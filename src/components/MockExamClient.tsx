@@ -467,6 +467,8 @@ export function MockExamClient({
     [trackId]
   );
 
+  const [answerFilter, setAnswerFilter] = useState<"all" | "incorrect" | "correct">("all");
+
   // Natural timer while taking the exam
   useEffect(() => {
     if (step !== "exam") return;
@@ -476,18 +478,74 @@ export function MockExamClient({
     return () => clearInterval(timer);
   }, [step]);
 
-  // Compute Diagnostic Results
+  // Compute Diagnostic Results dynamically based on track dimensions
   const results = useMemo(() => {
-    const dimTotals: Record<SkillDimensionKey, { correct: number; total: number }> = {
-      conceptual: { correct: 0, total: 0 },
-      applied: { correct: 0, total: 0 },
-      logic: { correct: 0, total: 0 },
-      accuracy: { correct: 0, total: 0 },
-      expression: { correct: 0, total: 0 },
-    };
+    const trackDims =
+      activeTrack.dimensions && activeTrack.dimensions.length > 0
+        ? activeTrack.dimensions
+        : [
+            {
+              key: "conceptual",
+              label: "ความเข้าใจแนวคิด",
+              shortLabel: "ความเข้าใจแนวคิด",
+              englishLabel: "Conceptual Understanding",
+              description: "ความเข้าใจมโนทัศน์และนิยามพื้นฐาน",
+              benchmarkPercent: 70,
+              strengthAdvice: "มีความเข้าใจหลักการพื้นฐานได้อย่างถูกต้องและแม่นยำ",
+              focusAdvice: "ควรทบทวนนิยามและแนวคิดพื้นฐานให้เห็นภาพชัดเจนยิ่งขึ้น",
+            },
+            {
+              key: "applied",
+              label: "การแก้โจทย์ปัญหาประยุกต์",
+              shortLabel: "โจทย์ประยุกต์",
+              englishLabel: "Problem Solving",
+              description: "การวิเคราะห์และประยุกต์ใช้ในโจทย์ปัญหา",
+              benchmarkPercent: 70,
+              strengthAdvice: "สามารถวิเคราะห์โจทย์ประยุกต์หลายขั้นตอนได้ดี",
+              focusAdvice: "ฝึกฝนการแยกแยะเงื่อนไขในโจทย์ปัญหาหลายขั้นตอน",
+            },
+            {
+              key: "logic",
+              label: "ตรรกะและแบบรูป",
+              shortLabel: "ตรรกะ",
+              englishLabel: "Logical Reasoning",
+              description: "การคิดเชิงเหตุผลและการจับแบบรูป",
+              benchmarkPercent: 75,
+              strengthAdvice: "มีไหวพริบในการมองหาแบบรูปและเชื่อมโยงตรรกะได้อย่างเป็นระบบ",
+              focusAdvice: "ฝึกสังเกตความสัมพันธ์และลำดับเหตุผลของโจทย์",
+            },
+            {
+              key: "accuracy",
+              label: "ความแม่นยำและการคำนวณ",
+              shortLabel: "ความแม่นยำ",
+              englishLabel: "Accuracy & Timing",
+              description: "ความแม่นยำและการบริหารเวลา",
+              benchmarkPercent: 75,
+              strengthAdvice: "คำนวณได้แม่นยำและบริหารเวลาได้ดีเยี่ยม",
+              focusAdvice: "หมั่นตรวจทานคำตอบและระมัดระวังจุดผิดพลาดเล็กๆ น้อยๆ",
+            },
+            {
+              key: "expression",
+              label: "การสื่อสารและการตีความ",
+              shortLabel: "การสื่อสาร",
+              englishLabel: "Communication",
+              description: "การถ่ายทอดและการตีความข้อมูล",
+              benchmarkPercent: 70,
+              strengthAdvice: "สามารถตีความและสื่อสารสาระสำคัญได้อย่างชัดเจน",
+              focusAdvice: "ฝึกฝนการแปลความหมายข้อความและสัญลักษณ์ทางวิชาการ",
+            },
+          ];
+
+    const dimTotals: Record<string, { correct: number; total: number }> = {};
+    for (const d of trackDims) {
+      dimTotals[d.key] = { correct: 0, total: 0 };
+    }
 
     let correctCount = 0;
     for (const q of activeTrack.questions) {
+      if (!dimTotals[q.dimension]) {
+        dimTotals[q.dimension] = { correct: 0, total: 0 };
+      }
       dimTotals[q.dimension].total += 1;
       if (isAnswerCorrect(q, answers[q.id])) {
         correctCount += 1;
@@ -495,38 +553,78 @@ export function MockExamClient({
       }
     }
 
-    const totalQuestions = activeTrack.questions.length;
+    const totalQuestions = activeTrack.questions.length || 1;
     const scorePercent = Math.round((correctCount / totalQuestions) * 100);
     const tier = classifyScoreTier(scorePercent);
+    const incorrectCount = Math.max(0, totalQuestions - correctCount);
 
-    const skillBreakdown: Record<SkillDimensionKey, number> = {
-      conceptual: dimTotals.conceptual.total
-        ? Math.round((dimTotals.conceptual.correct / dimTotals.conceptual.total) * 100)
-        : 0,
-      applied: dimTotals.applied.total
-        ? Math.round((dimTotals.applied.correct / dimTotals.applied.total) * 100)
-        : 0,
-      logic: dimTotals.logic.total
-        ? Math.round((dimTotals.logic.correct / dimTotals.logic.total) * 100)
-        : 0,
-      accuracy: dimTotals.accuracy.total
-        ? Math.round((dimTotals.accuracy.correct / dimTotals.accuracy.total) * 100)
-        : 0,
-      expression: dimTotals.expression.total
-        ? Math.round((dimTotals.expression.correct / dimTotals.expression.total) * 100)
-        : 0,
-    };
+    const dimensionResults = trackDims.map((dim) => {
+      const entry = dimTotals[dim.key] || { correct: 0, total: 0 };
+      const score =
+        entry.total > 0
+          ? Math.round((entry.correct / entry.total) * 100)
+          : 0;
+      return {
+        key: dim.key,
+        label: dim.label,
+        shortLabel: dim.shortLabel,
+        englishLabel: dim.englishLabel,
+        description: dim.description,
+        score,
+        correct: entry.correct,
+        total: entry.total,
+        benchmark: dim.benchmarkPercent ?? 70,
+        strengthAdvice: dim.strengthAdvice,
+        focusAdvice: dim.focusAdvice,
+      };
+    });
+
+    const skillBreakdown: Record<string, number> = {};
+    for (const d of dimensionResults) {
+      skillBreakdown[d.key] = d.score;
+    }
+
+    const sortedDesc = [...dimensionResults].sort((a, b) => b.score - a.score);
+    const sortedAsc = [...dimensionResults].sort((a, b) => a.score - b.score);
+    const topStrength = sortedDesc[0] || dimensionResults[0];
+    const topFocus = sortedAsc[0] || dimensionResults[0];
+
+    let percentileText = "อยู่ในเกณฑ์มาตรฐานเทียบเท่าค่าเฉลี่ยระดับชั้นเดียวกัน";
+    let percentileBadge = "Percentile 50+";
+    if (scorePercent >= 90) {
+      percentileText =
+        "อยู่ในกลุ่มคะแนนท็อป 10% ของผู้เข้าสอบระดับชั้นเดียวกัน (Percentile 90+) พร้อมต่อยอดสู่ห้องเรียนพิเศษ Gifted/EP และสนามสอบแข่งขัน";
+      percentileBadge = "Top 10% (P90+)";
+    } else if (scorePercent >= 75) {
+      percentileText =
+        "สูงกว่าค่าเฉลี่ย 75% ของผู้เข้าสอบระดับชั้นเดียวกัน มีพื้นฐานแข็งแกร่งและพร้อมพัฒนาต่อยอดสู่ระดับสูง";
+      percentileBadge = "Top 25% (P75+)";
+    } else if (scorePercent >= 50) {
+      percentileText =
+        "อยู่ในเกณฑ์มาตรฐานเทียบเท่าค่าเฉลี่ยระดับชั้นเดียวกัน แนะนำปิดจุดอ่อนเฉพาะบทเพื่อยกระดับสู่กลุ่มหัวกะทิ";
+      percentileBadge = "Average (P50+)";
+    } else {
+      percentileText =
+        "ควรเร่งเสริมความเข้าใจเชิงมโนทัศน์เพื่อยกระดับสู่เกณฑ์มาตรฐานผ่านคอร์สปูพื้นฐานกลุ่มย่อยเฉพาะบุคคล";
+      percentileBadge = "Foundational";
+    }
 
     const matched = courses.filter((c) => c.tierMatch === tier);
     const recommendedCourses = (matched.length ? matched : []).slice(0, 2);
 
     return {
       correctCount,
+      incorrectCount,
       totalQuestions,
       scorePercent,
       tier,
       tierInfo: TIER_MATRIX[tier],
       skillBreakdown,
+      dimensionResults,
+      topStrength,
+      topFocus,
+      percentileText,
+      percentileBadge,
       recommendedCourses,
     };
   }, [activeTrack, answers, courses]);
@@ -1274,171 +1372,474 @@ export function MockExamClient({
 
       {/* STEP 4: Smart Recommendation & Radar Dashboard */}
       {step === "results" && (
-        <div className="space-y-12">
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 bg-white border border-[#D3DEE8] p-6 sm:p-10">
-            <div className="lg:col-span-6 space-y-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono-tech text-sm px-2.5 py-1 bg-[#1E5079] text-white">
-                  {results.tierInfo.labelEn}
-                </span>
-                <span className="font-mono-tech text-sm px-2.5 py-1 bg-[#F2F6F9] text-[#0B7490]">
-                  ช่วงคะแนน {results.tierInfo.rangeLabel}
-                </span>
-              </div>
+        <div className="space-y-10">
+          {/* Action & Nav Bar (Hidden in Print) */}
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-[#F2F6F9] border border-[#D3DEE8] p-4 rounded-sm print:hidden">
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#188038]" />
+              <span className="text-xs font-semibold text-[#0F2A42]">
+                รายงานวิเคราะห์ผลการประเมินฉบับสมบูรณ์ (Certified Diagnostic Report)
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    sessionStorage.removeItem(SESSION_KEY);
+                    localStorage.removeItem(SESSION_KEY);
+                  } catch {}
+                  setAnswers({});
+                  setCurrentIndex(0);
+                  setElapsedSeconds(0);
+                  setStep("select");
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 border border-[#1E5079] text-[#1E5079] text-xs font-semibold hover:bg-[#E0F8FF] transition-colors"
+              >
+                <span>← เลือกชุดข้อสอบวิชาอื่น</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1E5079] text-white text-xs font-semibold hover:bg-[#143E61] transition-colors shadow-sm"
+              >
+                <span>พิมพ์ / บันทึกรายงานเป็น PDF</span>
+              </button>
+            </div>
+          </div>
 
+          {/* Official Diagnostic Letterhead Strip */}
+          <div className="bg-white border border-[#D3DEE8] p-6 sm:p-8 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#D3DEE8] pb-5">
               <div>
-                <div className="flex items-center gap-3 mb-2">
-                  {authUser?.avatarUrl ? (
-                    <img
-                      src={authUser.avatarUrl}
-                      alt={authUser.fullName}
-                      className="w-10 h-10 rounded-full border border-[#D3DEE8] object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-[#E0F8FF] text-[#1E5079] font-bold flex items-center justify-center text-sm">
-                      {authUser?.fullName?.charAt(0) || "G"}
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm font-semibold text-[#0F2A42]">
-                      {authUser?.fullName}
-                    </p>
-                    <p className="text-xs text-[#5A6F83]">
-                      {authUser?.email} · {activeTrack.title}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-baseline gap-4 mt-2">
-                  <span className="font-display text-6xl text-[#0F2A42]">
-                    {results.scorePercent}%
+                <div className="flex items-center gap-2">
+                  <span className="font-display text-2xl text-[#0F2A42] font-bold">
+                    Somkid<span className="text-[#00D1FF]">+</span>
                   </span>
-                  <span className="font-mono-tech text-sm text-[#5A6F83]">
-                    ({results.correctCount}/{results.totalQuestions} ข้อ · ใช้เวลา{" "}
-                    {formatTimer(elapsedSeconds)})
+                  <span className="text-xs font-mono-tech text-[#5A6F83] border-l border-[#D3DEE8] pl-2">
+                    สถาบันพัฒนาทักษะวิชาการและกิจกรรม เครือสมคิดวิทยา จ.ระยอง
                   </span>
                 </div>
-                <h2 className="text-xl font-semibold text-[#1E5079] mt-2">
-                  ระดับ: {results.tierInfo.labelTh}
-                </h2>
-              </div>
-
-              <p className="text-sm sm:text-base text-[#2B4660] leading-relaxed">
-                {results.tierInfo.summary}
-              </p>
-
-              <div className="bg-[#F2F6F9] p-4 border-l-4 border-[#1E5079] text-xs text-[#2B4660] space-y-1">
-                <p className="font-semibold text-[#0F2A42]">
-                  สิทธิพิเศษและขั้นตอนถัดไป ({webhookStatus})
+                <h1 className="text-xl sm:text-2xl font-bold text-[#0F2A42] mt-2">
+                  ใบรายงานผลการวินิจฉัยศักยภาพทางวิชาการรายบุคคล
+                </h1>
+                <p className="text-xs sm:text-sm text-[#5A6F83]">
+                  Individual Academic Diagnostic & Competency Assessment Report
                 </p>
-                <p>{results.tierInfo.adminAction}</p>
               </div>
-
-              <div className="flex flex-wrap gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    try {
-                      sessionStorage.removeItem(SESSION_KEY);
-                    } catch {}
-                    setAnswers({});
-                    setCurrentIndex(0);
-                    setElapsedSeconds(0);
-                    setStep("select");
-                  }}
-                  className="inline-flex items-center gap-2 px-4 py-2 border border-[#1E5079] text-[#1E5079] text-xs font-semibold hover:bg-[#E0F8FF] transition-colors"
-                >
-                  <span>← เลือกชุดข้อสอบวิชาอื่น</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="inline-flex items-center gap-2 px-4 py-2 border border-[#D3DEE8] text-[#5A6F83] text-xs font-medium hover:bg-[#F2F6F9] transition-colors"
-                >
-                  <span>พิมพ์ผลวิเคราะห์</span>
-                </button>
+              <div className="text-right">
+                <span className="inline-block px-3 py-1 bg-[#1E5079] text-white text-xs font-mono-tech font-semibold">
+                  {activeTrack.subjectLabel}
+                </span>
+                <p className="text-xs text-[#5A6F83] mt-1.5">
+                  วันที่ประเมิน: {new Date().toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })}
+                </p>
               </div>
             </div>
 
-            <div className="lg:col-span-6 flex flex-col items-center justify-center lg:border-l lg:border-[#D3DEE8] lg:pl-8">
-              <h3 className="font-mono-tech text-sm text-[#5A6F83] mb-2">
-                5-Dimension Skill Profile
-              </h3>
-              <SkillRadarChart scores={results.skillBreakdown} size={310} />
-              <div className="w-full grid grid-cols-2 gap-2 pt-4 hairline-t text-xs">
-                {(Object.keys(results.skillBreakdown) as SkillDimensionKey[]).map(
-                  (dim) => (
-                    <div key={dim} className="flex justify-between">
-                      <span className="text-[#5A6F83]">
-                        {SKILL_DIMENSION_LABELS[dim]}
-                      </span>
-                      <span className="font-mono-tech font-semibold text-[#0F2A42]">
-                        {results.skillBreakdown[dim]}%
-                      </span>
-                    </div>
-                  )
-                )}
+            {/* Student & Exam Info Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+              <div className="bg-[#F7F9FB] p-3 border border-[#E2E8F0]">
+                <span className="text-[#5A6F83] block">ชื่อผู้เข้าทดสอบ:</span>
+                <span className="font-semibold text-[#0F2A42] text-sm block mt-0.5 truncate">
+                  {authUser?.fullName || "นักเรียนผู้เข้าทดสอบ"}
+                </span>
+              </div>
+              <div className="bg-[#F7F9FB] p-3 border border-[#E2E8F0]">
+                <span className="text-[#5A6F83] block">ชุดข้อสอบ:</span>
+                <span className="font-semibold text-[#0F2A42] text-sm block mt-0.5 truncate">
+                  {activeTrack.title}
+                </span>
+              </div>
+              <div className="bg-[#F7F9FB] p-3 border border-[#E2E8F0]">
+                <span className="text-[#5A6F83] block">ช่วงชั้น / ระดับ:</span>
+                <span className="font-semibold text-[#0B7490] text-sm block mt-0.5">
+                  {activeTrack.gradeLabel}
+                </span>
+              </div>
+              <div className="bg-[#F7F9FB] p-3 border border-[#E2E8F0]">
+                <span className="text-[#5A6F83] block">เวลาที่ใช้ทำข้อสอบ:</span>
+                <span className="font-semibold text-[#0F2A42] text-sm block mt-0.5">
+                  {formatTimer(elapsedSeconds)} (เฉลี่ย {Math.round(elapsedSeconds / results.totalQuestions)} วิ/ข้อ)
+                </span>
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* Auto-Matched Course Recommendations */}
-          {results.recommendedCourses.length > 0 && (
-          <section className="space-y-6">
+          {/* Section 1: Executive Performance Summary */}
+          <section className="bg-white border border-[#D3DEE8] p-6 sm:p-8 space-y-6">
             <div>
-              <p className="font-mono-tech text-sm text-[#1E5079]">
-                Recommended Pathways
-              </p>
-              <h2 className="font-display text-3xl text-[#0F2A42] mt-1">
-                คอร์สเรียน Somkid+ ที่ระบบแนะนำตามผลคะแนนของคุณ
+              <span className="font-mono-tech text-xs text-[#1E5079] font-semibold uppercase tracking-wider">
+                Section 1 · Executive Summary
+              </span>
+              <h2 className="text-xl sm:text-2xl font-bold text-[#0F2A42] mt-0.5">
+                ภาพรวมผลการประเมินและเกณฑ์มาตรฐาน
               </h2>
             </div>
 
-            <div className="divide-y divide-[#D3DEE8] border-t border-b border-[#D3DEE8]">
-              {results.recommendedCourses.map((course) => (
-                <article
-                  key={course.id}
-                  className="py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center"
-                >
-                  <div className="lg:col-span-8 space-y-1.5">
-                    <div className="flex items-center gap-2 font-mono-tech text-sm text-[#1E5079]">
-                      <span>{course.code}</span>
-                      <span>·</span>
-                      <span>{course.gradeRange}</span>
-                      <span>·</span>
-                      <span>{course.schedule}</span>
-                    </div>
-                    <h3 className="text-xl font-semibold text-[#0F2A42]">
-                      {course.title}
-                    </h3>
-                    <p className="text-sm text-[#5A6F83]">{course.subtitle}</p>
-                  </div>
-                  <div className="lg:col-span-4 flex flex-wrap lg:justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setEnrollCourse(course)}
-                      className="bg-[#1E5079] hover:bg-[#143E61] text-white font-semibold px-5 py-3 text-sm transition-colors"
-                    >
-                      สมัครคอร์สนี้ทันที
-                    </button>
-                    <Link
-                      href="/academics"
-                      className="px-4 py-3 border border-[#0F2A42] text-sm font-medium text-[#0F2A42]"
-                    >
-                      ดูคอร์สทั้งหมด
-                    </Link>
-                  </div>
-                </article>
-              ))}
+            {/* 4 Performance Metric Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Score */}
+              <div className="bg-[#F7F9FB] border-2 border-[#1E5079] p-5 space-y-1">
+                <span className="text-xs text-[#5A6F83] font-medium">คะแนนรวมที่ได้</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-display text-5xl font-bold text-[#0F2A42]">
+                    {results.scorePercent}%
+                  </span>
+                  <span className="text-xs font-mono-tech text-[#5A6F83]">
+                    ({results.correctCount}/{results.totalQuestions} ข้อ)
+                  </span>
+                </div>
+                <div className="pt-2">
+                  <span className="inline-block text-[11px] px-2 py-0.5 bg-[#E0F8FF] text-[#1E5079] font-semibold">
+                    {results.scorePercent >= 80 ? "ผ่านเกณฑ์ระดับยอดเยี่ยม" : results.scorePercent >= 50 ? "ผ่านเกณฑ์มาตรฐาน" : "ต่ำกว่าเกณฑ์มาตรฐาน"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Tier */}
+              <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-5 space-y-1">
+                <span className="text-xs text-[#5A6F83] font-medium">ระดับพัฒนาการทางวิชาการ</span>
+                <p className="text-lg font-bold text-[#1E5079] mt-1">
+                  {results.tierInfo.labelTh}
+                </p>
+                <p className="font-mono-tech text-xs text-[#0B7490]">
+                  {results.tierInfo.labelEn}
+                </p>
+                <p className="text-[11px] text-[#5A6F83] pt-1">
+                  ช่วงคะแนน {results.tierInfo.rangeLabel}
+                </p>
+              </div>
+
+              {/* Percentile */}
+              <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-5 space-y-1">
+                <span className="text-xs text-[#5A6F83] font-medium">เกณฑ์มาตรฐานเทียบเท่า</span>
+                <p className="text-lg font-bold text-[#0F2A42] mt-1">
+                  {results.percentileBadge}
+                </p>
+                <p className="text-xs text-[#5A6F83] leading-snug">
+                  {results.percentileText}
+                </p>
+              </div>
+
+              {/* Pace & Speed */}
+              <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-5 space-y-1">
+                <span className="text-xs text-[#5A6F83] font-medium">ความคล่องตัวและเวลา</span>
+                <p className="text-lg font-bold text-[#0F2A42] mt-1">
+                  {formatTimer(elapsedSeconds)}
+                </p>
+                <p className="text-xs text-[#5A6F83]">
+                  เฉลี่ย {Math.round(elapsedSeconds / results.totalQuestions)} วินาทีต่อข้อ
+                </p>
+                <p className="text-[11px] text-[#15803D] font-medium pt-1">
+                  {elapsedSeconds <= activeTrack.durationMinutes * 60 ? "การบริหารเวลาอยู่ในเกณฑ์ดี" : "ควรฝึกความเร็วเพิ่มเติม"}
+                </p>
+              </div>
+            </div>
+
+            {/* Diagnostic Commentary */}
+            <div className="bg-[#F2F6F9] p-5 border-l-4 border-[#1E5079] space-y-2">
+              <p className="text-sm font-semibold text-[#0F2A42]">
+                บทวิเคราะห์ภาพรวมทางวิชาการ:
+              </p>
+              <p className="text-sm text-[#2B4660] leading-relaxed">
+                {results.tierInfo.summary}
+              </p>
+              <p className="text-xs text-[#5A6F83] pt-1 border-t border-[#D3DEE8]">
+                <strong className="text-[#0F2A42]">คำแนะนำเชิงสถาบัน:</strong> {results.tierInfo.adminAction}
+              </p>
             </div>
           </section>
+
+          {/* Section 2: Subject-Specific 5-Dimension Radar Profile & Competencies */}
+          <section className="bg-white border border-[#D3DEE8] p-6 sm:p-8 space-y-6">
+            <div>
+              <span className="font-mono-tech text-xs text-[#1E5079] font-semibold uppercase tracking-wider">
+                Section 2 · 5-Dimension Profile
+              </span>
+              <h2 className="text-xl sm:text-2xl font-bold text-[#0F2A42] mt-0.5">
+                กราฟเรดาร์และรายละเอียดศักยภาพ 5 ด้าน ({activeTrack.title})
+              </h2>
+              <p className="text-xs sm:text-sm text-[#5A6F83] mt-1">
+                แสดงผลการวัดระดับทักษะเฉพาะวิชา เทียบกับเส้นประเกณฑ์มาตรฐานอ้างอิง (70%)
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+              {/* Radar Chart Column */}
+              <div className="lg:col-span-6 flex flex-col items-center justify-center p-2">
+                <SkillRadarChart
+                  dimensions={results.dimensionResults}
+                  size={320}
+                  showBenchmark={true}
+                />
+              </div>
+
+              {/* Dimension Breakdown Cards Column */}
+              <div className="lg:col-span-6 space-y-3">
+                {results.dimensionResults.map((dim) => {
+                  const isStrong = dim.score >= 80;
+                  const isModerate = dim.score >= 50 && dim.score < 80;
+                  return (
+                    <div
+                      key={dim.key}
+                      className="p-3.5 bg-[#F7F9FB] border border-[#D3DEE8] space-y-2"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="text-sm font-bold text-[#0F2A42]">
+                            {dim.label}
+                          </span>
+                          <span className="text-xs text-[#5A6F83] ml-2 font-mono-tech">
+                            ({dim.englishLabel})
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono-tech text-[#5A6F83]">
+                            {dim.correct}/{dim.total} ข้อ
+                          </span>
+                          <span
+                            className={`font-mono-tech text-xs px-2 py-0.5 font-bold ${
+                              isStrong
+                                ? "bg-[#e6f4ea] text-[#188038]"
+                                : isModerate
+                                ? "bg-[#E0F8FF] text-[#1E5079]"
+                                : "bg-[#fdf2f2] text-[#B31B1B]"
+                            }`}
+                          >
+                            {dim.score}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="w-full h-2 bg-[#E2E8F0] overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            isStrong
+                              ? "bg-[#188038]"
+                              : isModerate
+                              ? "bg-[#00D1FF]"
+                              : "bg-[#DC2626]"
+                          }`}
+                          style={{ width: `${Math.max(4, dim.score)}%` }}
+                        />
+                      </div>
+
+                      <p className="text-xs text-[#5A6F83] leading-relaxed">
+                        {dim.description}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
+          {/* Section 3: Deep Diagnostic: Strengths & Priority Focus Areas */}
+          <section className="bg-white border border-[#D3DEE8] p-6 sm:p-8 space-y-6">
+            <div>
+              <span className="font-mono-tech text-xs text-[#1E5079] font-semibold uppercase tracking-wider">
+                Section 3 · Pedagogical Diagnostics
+              </span>
+              <h2 className="text-xl sm:text-2xl font-bold text-[#0F2A42] mt-0.5">
+                การวินิจฉัยจุดเด่นและจุดที่ควรพัฒนาเสริมเร่งด่วน
+              </h2>
+              <p className="text-xs sm:text-sm text-[#5A6F83] mt-1">
+                วิเคราะห์เชิงลึกจากพฤติกรรมการตอบข้อสอบ พร้อมข้อสังเกตและคำแนะนำเชิงปฏิบัติการสำหรับผู้ปกครอง
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Strength Card */}
+              <div className="bg-[#F0FDF4] border-2 border-[#16A34A] p-6 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 bg-[#16A34A] rounded-full" />
+                  <span className="text-xs font-mono-tech font-bold text-[#16A34A] uppercase tracking-wider">
+                    จุดเด่นและศักยภาพหลัก (Key Strengths)
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-[#0F2A42]">
+                  {results.topStrength.label} ({results.topStrength.score}%)
+                </h3>
+                <p className="text-xs sm:text-sm text-[#2B4660] leading-relaxed">
+                  {results.topStrength.strengthAdvice}
+                </p>
+                <div className="pt-2 border-t border-[#BBF7D0] text-xs text-[#166534]">
+                  <strong className="block text-[#14532D] mb-0.5">ข้อสังเกตเชิงบวก:</strong>
+                  น้องมีฐานความเข้าใจในหมวดนี้ที่มั่นคง สามารถคิดเป็นระบบและนำไปต่อยอดสู่โจทย์แข่งขันหรือห้องเรียนพิเศษได้อย่างมั่นใจ
+                </div>
+              </div>
+
+              {/* Priority Focus Card */}
+              <div className="bg-[#FEF2F2] border-2 border-[#DC2626] p-6 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 bg-[#DC2626] rounded-full" />
+                  <span className="text-xs font-mono-tech font-bold text-[#DC2626] uppercase tracking-wider">
+                    จุดที่ควรเสริมเร่งด่วน (Priority Focus Area)
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-[#0F2A42]">
+                  {results.topFocus.label} ({results.topFocus.score}%)
+                </h3>
+                <p className="text-xs sm:text-sm text-[#2B4660] leading-relaxed">
+                  {results.topFocus.focusAdvice}
+                </p>
+                <div className="pt-2 border-t border-[#FECACA] text-xs text-[#991B1B]">
+                  <strong className="block text-[#7F1D1D] mb-0.5">คำแนะนำสำหรับผู้ปกครอง:</strong>
+                  หลีกเลี่ยงการเร่งให้ท่องจำสูตรหรือเฉลยลัด แนะนำให้ฝึกทำความเข้าใจมโนทัศน์ทีละขั้น และฝึกถอดความโจทย์ปัญหาด้วยคำพูดของน้องเอง
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Section 4: Personalized 3-Phase Learning Pathway */}
+          <section className="bg-white border border-[#D3DEE8] p-6 sm:p-8 space-y-6">
+            <div>
+              <span className="font-mono-tech text-xs text-[#1E5079] font-semibold uppercase tracking-wider">
+                Section 4 · Actionable Roadmap
+              </span>
+              <h2 className="text-xl sm:text-2xl font-bold text-[#0F2A42] mt-0.5">
+                แผนพัฒนาการเรียนรู้เฉพาะบุคคล 3 ขั้นตอน (12 สัปดาห์)
+              </h2>
+              <p className="text-xs sm:text-sm text-[#5A6F83] mt-1">
+                แนวทางเสริมทักษะที่เป็นระบบเพื่อช่วยให้น้องก้าวจากระดับปัจจุบันสู่ระดับถัดไปอย่างมั่นคง
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Phase 1 */}
+              <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono-tech text-xs px-2.5 py-0.5 bg-[#1E5079] text-white font-semibold">
+                    ระยะที่ 1 (สัปดาห์ 1 – 4)
+                  </span>
+                  <span className="text-xs text-[#5A6F83] font-mono-tech">สัปดาห์ 1-4</span>
+                </div>
+                <h3 className="text-base font-bold text-[#0F2A42]">
+                  ซ่อมรากฐานและปิดจุดบกพร่อง
+                </h3>
+                <p className="text-xs text-[#2B4660] leading-relaxed">
+                  โฟกัสการเคลียร์นิยามและมโนทัศน์ในหัวข้อ <strong>{results.topFocus.label}</strong> ให้แจ่มแจ้ง 100% โดยเริ่มจากแบบฝึกหัดพื้นฐานและฝึกเขียนอธิบายขั้นตอน
+                </p>
+                <div className="text-[11px] text-[#0B7490] pt-1">
+                  เป้าหมาย: ความแม่นยำในโจทย์พื้นฐาน {'>'} 90%
+                </div>
+              </div>
+
+              {/* Phase 2 */}
+              <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono-tech text-xs px-2.5 py-0.5 bg-[#00D1FF] text-[#0F2A42] font-semibold">
+                    ระยะที่ 2 (สัปดาห์ 5 – 8)
+                  </span>
+                  <span className="text-xs text-[#5A6F83] font-mono-tech">สัปดาห์ 5-8</span>
+                </div>
+                <h3 className="text-base font-bold text-[#0F2A42]">
+                  ฝึกโจทย์ประยุกต์และสร้างความเร็ว
+                </h3>
+                <p className="text-xs text-[#2B4660] leading-relaxed">
+                  เพิ่มความท้าทายด้วยโจทย์ปัญหาประยุกต์หลายขั้นตอน ฝึกเชื่อมโยงข้อมูลข้ามหัวข้อ และเริ่มฝึกจับเวลาทำข้อสอบ 1 – 1.5 นาทีต่อข้อ
+                </p>
+                <div className="text-[11px] text-[#0B7490] pt-1">
+                  เป้าหมาย: แก้โจทย์ประยุกต์ได้คล่องแคล่วและตรงเวลา
+                </div>
+              </div>
+
+              {/* Phase 3 */}
+              <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono-tech text-xs px-2.5 py-0.5 bg-[#0F2A42] text-white font-semibold">
+                    ระยะที่ 3 (สัปดาห์ 9 – 12)
+                  </span>
+                  <span className="text-xs text-[#5A6F83] font-mono-tech">สัปดาห์ 9-12</span>
+                </div>
+                <h3 className="text-base font-bold text-[#0F2A42]">
+                  สู่ความเป็นเลิศและจำลองสนามสอบ
+                </h3>
+                <p className="text-xs text-[#2B4660] leading-relaxed">
+                  ทำข้อสอบจำลองเสมือนจริงแบบเต็มชุด ฝึกการคัดกรองข้อสอบ การบริหารความกดดัน และเตรียมความพร้อมสู่สนามสอบเข้าและเวทีวิชาการ
+                </p>
+                <div className="text-[11px] text-[#0B7490] pt-1">
+                  เป้าหมาย: คะแนนประเมินรวม {'>'} 85% พร้อมแข่งขัน
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Section 5: Auto-Matched Course Recommendations */}
+          {results.recommendedCourses.length > 0 && (
+            <section className="bg-white border border-[#D3DEE8] p-6 sm:p-8 space-y-6">
+              <div>
+                <span className="font-mono-tech text-xs text-[#1E5079] font-semibold uppercase tracking-wider">
+                  Section 5 · Recommended Pathways
+                </span>
+                <h2 className="text-xl sm:text-2xl font-bold text-[#0F2A42] mt-0.5">
+                  คอร์สเรียน Somkid+ ที่แนะนำตามผลคะแนนของนักเรียน
+                </h2>
+                <p className="text-xs sm:text-sm text-[#5A6F83] mt-1">
+                  คัดเลือกหลักสูตรที่ตรงกับระดับพัฒนาการและช่วยปิดจุดอ่อนของน้องได้ตรงจุดที่สุด
+                </p>
+              </div>
+
+              <div className="divide-y divide-[#D3DEE8] border-t border-b border-[#D3DEE8]">
+                {results.recommendedCourses.map((course) => (
+                  <article
+                    key={course.id}
+                    className="py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center"
+                  >
+                    <div className="lg:col-span-8 space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2 font-mono-tech text-xs text-[#1E5079]">
+                        <span className="px-2 py-0.5 bg-[#F2F6F9] border border-[#D3DEE8] font-bold">
+                          {course.code}
+                        </span>
+                        <span>·</span>
+                        <span>{course.gradeRange}</span>
+                        <span>·</span>
+                        <span>{course.schedule}</span>
+                        <span>·</span>
+                        <span className="text-[#0B7490]">เหลืออีก {course.seatsRemaining} ที่นั่ง</span>
+                      </div>
+                      <h3 className="text-lg sm:text-xl font-bold text-[#0F2A42]">
+                        {course.title}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-[#5A6F83] leading-relaxed">
+                        {course.subtitle}
+                      </p>
+                      {course.outcomes && course.outcomes.length > 0 && (
+                        <ul className="text-xs text-[#2B4660] space-y-1 pt-1 list-disc list-inside">
+                          {course.outcomes.slice(0, 2).map((oc, i) => (
+                            <li key={i}>{oc}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <div className="lg:col-span-4 flex flex-wrap lg:justify-end gap-3 print:hidden">
+                      <button
+                        type="button"
+                        onClick={() => setEnrollCourse(course)}
+                        className="bg-[#1E5079] hover:bg-[#143E61] text-white font-semibold px-5 py-2.5 text-xs sm:text-sm transition-colors shadow-sm"
+                      >
+                        สมัครคอร์สนี้ทันที
+                      </button>
+                      <Link
+                        href="/academics"
+                        className="px-4 py-2.5 border border-[#0F2A42] text-xs sm:text-sm font-medium text-[#0F2A42] hover:bg-[#F2F6F9] transition-colors"
+                      >
+                        ดูคอร์สทั้งหมด
+                      </Link>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
           )}
 
-          {/* Consultation & Full PDF Request Card */}
-          <section className="bg-[#F8FAFC] border-2 border-[#1E5079] p-6 sm:p-8 space-y-4">
+          {/* Section 6: Consultation & Full PDF Request Card */}
+          <section className="bg-[#F8FAFC] border-2 border-[#1E5079] p-6 sm:p-8 space-y-4 print:hidden">
             <div className="max-w-3xl space-y-1">
               <span className="font-mono-tech text-xs text-[#0B7490] font-semibold uppercase tracking-wider">
-                Full Diagnostic PDF & Academic Consultation
+                Section 6 · Academic Consultation & Delivery
               </span>
               <h3 className="font-display text-2xl text-[#0F2A42]">
                 รับไฟล์รายงานผลวิเคราะห์ 5 มิติฉบับสมบูรณ์ (PDF) และปรึกษาอาจารย์ Somkid+
@@ -1505,82 +1906,171 @@ export function MockExamClient({
             )}
           </section>
 
-          {/* Answer Key & Explanations */}
-          <section className="space-y-4">
-            <h2 className="font-display text-2xl text-[#0F2A42]">
-              เฉลยและคำอธิบายรายข้อ
-            </h2>
-            <div className="divide-y divide-[#D3DEE8] border-t border-b border-[#D3DEE8]">
-              {activeTrack.questions.map((q, idx) => {
-                const userAns = answers[q.id];
-                const isCorrect = isAnswerCorrect(q, userAns);
-                const userFormatted = formatUserAnswer(q, userAns);
-                const correctFormatted = formatCorrectAnswer(q);
-                return (
-                  <div key={q.id} className="py-5 space-y-2 text-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-[#0F2A42]">
-                          ข้อ {idx + 1}. <MathText text={q.prompt} as="span" />
-                        </span>
-                        {q.topic && (
-                          <span className="text-xs px-2 py-0.5 bg-[#F2F6F9] text-[#1E5079] font-mono-tech border border-[#D3DEE8]">
-                            {q.topic}
+          {/* Section 7: Interactive Answer Key & Step-by-Step Solutions */}
+          <section className="bg-white border border-[#D3DEE8] p-6 sm:p-8 space-y-6">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#D3DEE8] pb-4">
+              <div>
+                <span className="font-mono-tech text-xs text-[#1E5079] font-semibold uppercase tracking-wider">
+                  Section 7 · Answer Key & Review
+                </span>
+                <h2 className="text-xl sm:text-2xl font-bold text-[#0F2A42] mt-0.5">
+                  เฉลยละเอียดและทบทวนข้อสอบรายข้อ
+                </h2>
+                <p className="text-xs sm:text-sm text-[#5A6F83] mt-0.5">
+                  ตรวจทานคำตอบของคุณ พร้อมคำอธิบายวิธีคิดอย่างละเอียดทุกขั้นตอน
+                </p>
+              </div>
+
+              {/* Filter Tabs (Print: hidden) */}
+              <div className="flex flex-wrap items-center gap-2 print:hidden">
+                <button
+                  type="button"
+                  onClick={() => setAnswerFilter("all")}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-sm transition-colors ${
+                    answerFilter === "all"
+                      ? "bg-[#1E5079] text-white"
+                      : "bg-[#F2F6F9] text-[#5A6F83] hover:bg-[#E0F8FF]"
+                  }`}
+                >
+                  ทั้งหมด ({activeTrack.questions.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAnswerFilter("incorrect")}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-sm transition-colors ${
+                    answerFilter === "incorrect"
+                      ? "bg-[#DC2626] text-white"
+                      : "bg-[#FEE2E2] text-[#B91C1C] hover:bg-[#FECACA]"
+                  }`}
+                >
+                  ข้อที่ควรทบทวน ({results.incorrectCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAnswerFilter("correct")}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-sm transition-colors ${
+                    answerFilter === "correct"
+                      ? "bg-[#16A34A] text-white"
+                      : "bg-[#DCFCE7] text-[#15803D] hover:bg-[#BBF7D0]"
+                  }`}
+                >
+                  ข้อที่ตอบถูก ({results.correctCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Filtered Question Cards */}
+            <div className="divide-y divide-[#D3DEE8]">
+              {activeTrack.questions
+                .filter((q) => {
+                  const isCorrect = isAnswerCorrect(q, answers[q.id]);
+                  if (answerFilter === "incorrect") return !isCorrect;
+                  if (answerFilter === "correct") return isCorrect;
+                  return true;
+                })
+                .map((q) => {
+                  const userAns = answers[q.id];
+                  const isCorrect = isAnswerCorrect(q, userAns);
+                  const userFormatted = formatUserAnswer(q, userAns);
+                  const correctFormatted = formatCorrectAnswer(q);
+                  const originalIdx = activeTrack.questions.findIndex((item) => item.id === q.id);
+
+                  return (
+                    <div key={q.id} className="py-6 space-y-3 text-sm">
+                      {/* Question Header Strip */}
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-[#0F2A42] text-base">
+                            ข้อที่ {originalIdx + 1}
                           </span>
-                        )}
-                        <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 font-mono-tech">
-                          {q.type === "multiple_choice"
-                            ? "เลือกตอบหลายข้อ"
-                            : q.type === "numeric_input"
-                            ? "อัตนัยเติมคำตอบ"
-                            : q.type === "true_false"
-                            ? "วิเคราะห์ถูก/ผิด"
-                            : "ปรนัย"}
+                          <span className="text-xs px-2.5 py-0.5 bg-[#F2F6F9] text-[#1E5079] font-mono-tech border border-[#D3DEE8] font-semibold">
+                            {SKILL_DIMENSION_LABELS[q.dimension] || q.dimension}
+                          </span>
+                          {q.topic && (
+                            <span className="text-xs px-2.5 py-0.5 bg-[#F8FAFC] text-[#5A6F83] border border-[#E2E8F0]">
+                              {q.topic}
+                            </span>
+                          )}
+                          <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 font-mono-tech">
+                            {q.type === "multiple_choice"
+                              ? "เลือกตอบหลายข้อ"
+                              : q.type === "numeric_input"
+                              ? "อัตนัยเติมคำตอบ"
+                              : q.type === "true_false"
+                              ? "วิเคราะห์ถูก/ผิด"
+                              : "ปรนัย"}
+                          </span>
+                        </div>
+                        <span
+                          className={`font-mono-tech text-xs px-3 py-1 font-bold shrink-0 ${
+                            isCorrect
+                              ? "bg-[#e6f4ea] text-[#188038]"
+                              : "bg-[#fdf2f2] text-[#B31B1B]"
+                          }`}
+                        >
+                          {isCorrect ? "ถูกต้อง" : "ควรทบทวน"}
                         </span>
                       </div>
-                      <span
-                        className={`font-mono-tech text-xs px-2.5 py-1 font-semibold shrink-0 ${
-                          isCorrect
-                            ? "bg-[#e6f4ea] text-[#188038]"
-                            : "bg-[#fdf2f2] text-[#B31B1B]"
-                        }`}
-                      >
-                        {isCorrect ? "ถูกต้อง" : "ควรทบทวน"}
-                      </span>
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-[#F7F9FB] p-3 border border-[#D3DEE8]">
-                      <div>
-                        <span className="text-[#5A6F83]">คำตอบของคุณ: </span>
-                        <MathText
-                          text={userFormatted}
-                          as="strong"
-                          className={
-                            isCorrect ? "text-[#188038]" : "text-[#B31B1B]"
-                          }
-                        />
+                      {/* Context Passage if present */}
+                      {q.contextPassage && (
+                        <div className="bg-[#F8FAFC] border-l-4 border-[#1E5079] p-3 text-xs text-[#2B4660] italic leading-relaxed">
+                          {q.contextPassage}
+                        </div>
+                      )}
+
+                      {/* Diagram if present */}
+                      {q.diagramType && q.diagramType !== "none" && (
+                        <QuestionDiagram type={q.diagramType} />
+                      )}
+
+                      {/* Question Prompt */}
+                      <div className="text-[#0F2A42] font-medium leading-relaxed">
+                        <MathText text={q.prompt} as="p" />
                       </div>
-                      <div>
-                        <span className="text-[#5A6F83]">คำตอบที่ถูกต้อง: </span>
-                        <MathText
-                          text={correctFormatted}
-                          as="strong"
-                          className="text-[#0F2A42]"
-                        />
+
+                      {/* User Answer vs Correct Answer Box */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-[#F7F9FB] p-3.5 border border-[#D3DEE8]">
+                        <div>
+                          <span className="text-[#5A6F83] block mb-0.5 font-medium">คำตอบของคุณ:</span>
+                          <MathText
+                            text={userFormatted}
+                            as="span"
+                            className={`font-bold ${isCorrect ? "text-[#188038]" : "text-[#B31B1B]"}`}
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[#5A6F83] block mb-0.5 font-medium">คำตอบที่ถูกต้อง:</span>
+                          <MathText
+                            text={correctFormatted}
+                            as="span"
+                            className="font-bold text-[#0F2A42]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Step-by-Step Explanation */}
+                      <div className="bg-[#F0F7FA] p-3.5 border border-[#BAE6FD] text-xs text-[#0F2A42] leading-relaxed space-y-1">
+                        <span className="font-bold text-[#0369A1] block">
+                          แนวคิดและวิธีทำละเอียด:
+                        </span>
+                        <MathText text={q.explanation} as="div" />
                       </div>
                     </div>
-
-                    <p className="text-xs text-[#2B4660] leading-relaxed pt-1">
-                      <span className="font-semibold text-[#1E5079]">
-                        แนวคิดเฉลย:
-                      </span>{" "}
-                      <MathText text={q.explanation} as="span" />
-                    </p>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </section>
+
+          {/* Official Verification Footer Strip */}
+          <footer className="text-center py-6 border-t border-[#D3DEE8] text-xs text-[#5A6F83] space-y-1">
+            <p className="font-semibold text-[#0F2A42]">
+              สถาบันพัฒนาทักษะวิชาการและกิจกรรม Somkid+ เครือสมคิดวิทยา จ.ระยอง
+            </p>
+            <p>
+              รายงานนี้จัดทำขึ้นโดยระบบวินิจฉัยศักยภาพทางวิชาการอัตโนมัติ เพื่อเป็นข้อมูลสำหรับผู้ปกครองและอาจารย์ผู้สอนในการวางแผนพัฒนาการเรียนรู้เฉพาะบุคคล
+            </p>
+          </footer>
         </div>
       )}
 

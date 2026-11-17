@@ -1,146 +1,258 @@
 "use client";
 
-import { type SkillDimensionKey } from "@/data/somkid-data";
-
-interface SkillRadarChartProps {
-  scores: Record<SkillDimensionKey, number>; // 0 - 100
-  size?: number;
+export interface RadarDimensionItem {
+  key: string;
+  label: string;
+  shortLabel?: string;
+  score: number; // 0 - 100
+  benchmark?: number; // e.g. 70
 }
 
-const DIMENSIONS: SkillDimensionKey[] = [
-  "conceptual",
-  "applied",
-  "logic",
-  "accuracy",
-  "expression",
+interface SkillRadarChartProps {
+  dimensions?: RadarDimensionItem[];
+  scores?: Record<string, number>;
+  size?: number;
+  showBenchmark?: boolean;
+  className?: string;
+}
+
+const LEGACY_DIMENSIONS = [
+  { key: "conceptual", label: "ความเข้าใจแนวคิด", shortLabel: "ความเข้าใจแนวคิด" },
+  { key: "applied", label: "การแก้โจทย์ประยุกต์", shortLabel: "โจทย์ประยุกต์" },
+  { key: "logic", label: "ตรรกะและแบบรูป", shortLabel: "ตรรกะ" },
+  { key: "accuracy", label: "ความแม่นยำและการคำนวณ", shortLabel: "ความแม่นยำ" },
+  { key: "expression", label: "การสื่อสารและการตีความ", shortLabel: "การสื่อสาร" },
 ];
 
-const DIMENSION_LABELS: Record<
-  SkillDimensionKey,
-  { lines: string[] }
-> = {
-  conceptual: { lines: ["ความเข้าใจแนวคิด"] },
-  applied: { lines: ["การวิเคราะห์", "โจทย์ประยุกต์"] },
-  logic: { lines: ["ตรรกะ"] },
-  accuracy: { lines: ["ความแม่นยำ"] },
-  expression: { lines: ["การสื่อสาร"] },
-};
+export function SkillRadarChart({
+  dimensions,
+  scores,
+  size = 320,
+  showBenchmark = true,
+  className = "",
+}: SkillRadarChartProps) {
+  // Normalize items
+  const items: RadarDimensionItem[] =
+    dimensions && dimensions.length > 0
+      ? dimensions
+      : LEGACY_DIMENSIONS.map((d) => ({
+          key: d.key,
+          label: d.label,
+          shortLabel: d.shortLabel,
+          score: scores?.[d.key] ?? 50,
+          benchmark: 70,
+        }));
 
-export function SkillRadarChart({ scores, size = 320 }: SkillRadarChartProps) {
-  // Proportional width with horizontal padding so labels never clip
-  const vbWidth = Math.max(340, Math.round(size * 1.16));
-  const vbHeight = size;
+  const count = items.length || 5;
+
+  // ViewBox layout with safe margins for labels
+  const vbWidth = Math.max(380, Math.round(size * 1.25));
+  const vbHeight = Math.max(340, Math.round(size * 1.05));
   const cx = vbWidth / 2;
-  const cy = vbHeight / 2;
-  const radius = size * 0.285;
-  const levels = [25, 50, 75, 100];
+  const cy = vbHeight / 2 - 4;
+  const radius = size * 0.3;
+  const gridLevels = [25, 50, 75, 100];
 
   const getPoint = (index: number, percent: number) => {
-    const angle = (Math.PI * 2 * index) / DIMENSIONS.length - Math.PI / 2;
-    const r = (radius * percent) / 100;
+    const angle = (Math.PI * 2 * index) / count - Math.PI / 2;
+    const r = (radius * Math.max(0, Math.min(100, percent))) / 100;
     return {
       x: cx + r * Math.cos(angle),
       y: cy + r * Math.sin(angle),
     };
   };
 
-  const polygonPoints = DIMENSIONS.map((dim, idx) => {
-    const p = getPoint(idx, Math.max(10, scores[dim] ?? 0));
-    return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
-  }).join(" ");
+  // Student Score Polygon
+  const scorePolygon = items
+    .map((item, idx) => {
+      const p = getPoint(idx, Math.max(8, item.score));
+      return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  // Benchmark Polygon (Standard 70%)
+  const benchmarkPolygon = items
+    .map((item, idx) => {
+      const p = getPoint(idx, item.benchmark ?? 70);
+      return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+    })
+    .join(" ");
 
   return (
-    <figure className="flex flex-col items-center">
+    <figure className={`flex flex-col items-center select-none ${className}`}>
       <svg
         viewBox={`0 0 ${vbWidth} ${vbHeight}`}
-        className="w-full max-w-[340px] h-auto overflow-visible"
+        className="w-full max-w-[420px] h-auto overflow-visible"
         role="img"
-        aria-label="กราฟเรดาร์แสดงผลประเมินทักษะ 5 มิติ"
+        aria-label="กราฟเรดาร์แสดงผลประเมินทักษะ 5 มิติเฉพาะวิชา"
       >
-        {/* Concentric pentagon grid */}
-        {levels.map((lvl) => {
-          const pts = DIMENSIONS.map((_, idx) => {
-            const p = getPoint(idx, lvl);
-            return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
-          }).join(" ");
-          return (
-            <polygon
-              key={lvl}
-              points={pts}
-              fill="none"
-              stroke="#D3DEE8"
-              strokeWidth={lvl === 100 ? "1.25" : "0.75"}
-            />
-          );
-        })}
+        <defs>
+          <linearGradient id="scoreAreaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#00D1FF" stopOpacity="0.38" />
+            <stop offset="100%" stopColor="#1E5079" stopOpacity="0.22" />
+          </linearGradient>
+          <radialGradient id="dotGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#00D1FF" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#00D1FF" stopOpacity="0" />
+          </radialGradient>
+        </defs>
 
-        {/* Axis spokes and labels */}
-        {DIMENSIONS.map((dim, idx) => {
-          const outer = getPoint(idx, 100);
-          const labelDist = idx === 0 ? 122 : idx === 1 || idx === 4 ? 126 : 124;
-          const labelPt = getPoint(idx, labelDist);
-          const labelCfg = DIMENSION_LABELS[dim];
-
+        {/* Concentric grid pentagons */}
+        {gridLevels.map((lvl) => {
+          const pts = items
+            .map((_, idx) => {
+              const p = getPoint(idx, lvl);
+              return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+            })
+            .join(" ");
           return (
-            <g key={dim}>
-              <line
-                x1={cx}
-                y1={cy}
-                x2={outer.x}
-                y2={outer.y}
+            <g key={lvl}>
+              <polygon
+                points={pts}
+                fill={lvl === 100 ? "#F8FAFC" : "none"}
                 stroke="#D3DEE8"
-                strokeWidth="0.75"
+                strokeWidth={lvl === 100 ? "1.5" : "0.75"}
               />
+              {/* Scale reference watermark (along top-right axis) */}
               <text
-                x={labelPt.x}
-                y={labelPt.y}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fill="#0F2A42"
-                fontSize="10.5"
-                fontWeight="600"
+                x={cx + 6}
+                y={cy - (radius * lvl) / 100 + 10}
+                fill="#94A3B8"
+                fontSize="8"
+                fontWeight="500"
+                fontFamily="inherit"
               >
-                {labelCfg.lines.length === 1 ? (
-                  labelCfg.lines[0]
-                ) : (
-                  <>
-                    <tspan x={labelPt.x} dy="-0.55em">
-                      {labelCfg.lines[0]}
-                    </tspan>
-                    <tspan x={labelPt.x} dy="1.2em">
-                      {labelCfg.lines[1]}
-                    </tspan>
-                  </>
-                )}
+                {lvl}%
               </text>
             </g>
           );
         })}
 
-        {/* Data polygon */}
+        {/* Benchmark 70% Reference Line */}
+        {showBenchmark && (
+          <polygon
+            points={benchmarkPolygon}
+            fill="none"
+            stroke="#94A3B8"
+            strokeWidth="1.25"
+            strokeDasharray="4 3"
+          />
+        )}
+
+        {/* Axis Spokes and Dynamic Labels */}
+        {items.map((item, idx) => {
+          const outer = getPoint(idx, 100);
+          const angle = (Math.PI * 2 * idx) / count - Math.PI / 2;
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+
+          // Position text outside outer perimeter
+          const labelDist = radius + 24;
+          const lx = cx + labelDist * cos;
+          const ly = cy + labelDist * sin;
+
+          // Alignment logic based on quadrant
+          let textAnchor: "middle" | "start" | "end" = "middle";
+          if (cos > 0.3) textAnchor = "start";
+          else if (cos < -0.3) textAnchor = "end";
+
+          let dominantBaseline: "auto" | "central" | "hanging" = "central";
+          if (sin < -0.6) dominantBaseline = "auto";
+          else if (sin > 0.6) dominantBaseline = "hanging";
+
+          const displayLabel = item.shortLabel || item.label;
+
+          return (
+            <g key={item.key}>
+              {/* Spoke line */}
+              <line
+                x1={cx}
+                y1={cy}
+                x2={outer.x}
+                y2={outer.y}
+                stroke="#CBD5E1"
+                strokeWidth="0.85"
+              />
+
+              {/* Label + Score Pill */}
+              <text
+                x={lx}
+                y={ly}
+                textAnchor={textAnchor}
+                dominantBaseline={dominantBaseline}
+                className="select-none"
+              >
+                <tspan
+                  fill="#0F2A42"
+                  fontSize="11"
+                  fontWeight="600"
+                  fontFamily="inherit"
+                >
+                  {displayLabel}
+                </tspan>
+                <tspan
+                  dx="4"
+                  fill={
+                    item.score >= 80
+                      ? "#15803D"
+                      : item.score >= 50
+                      ? "#0284C7"
+                      : "#B91C1C"
+                  }
+                  fontSize="11"
+                  fontWeight="700"
+                  fontFamily="inherit"
+                >
+                  {item.score}%
+                </tspan>
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Student Score Filled Area */}
         <polygon
-          points={polygonPoints}
-          fill="rgba(30, 80, 121, 0.22)"
+          points={scorePolygon}
+          fill="url(#scoreAreaGrad)"
           stroke="#1E5079"
-          strokeWidth="2"
+          strokeWidth="2.25"
+          strokeLinejoin="round"
         />
 
-        {/* Data vertices */}
-        {DIMENSIONS.map((dim, idx) => {
-          const pt = getPoint(idx, Math.max(10, scores[dim] ?? 0));
+        {/* Score Vertices Dots */}
+        {items.map((item, idx) => {
+          const pt = getPoint(idx, Math.max(8, item.score));
           return (
-            <circle
-              key={dim}
-              cx={pt.x}
-              cy={pt.y}
-              r="4"
-              fill="#00D1FF"
-              stroke="#0F2A42"
-              strokeWidth="1.5"
-            />
+            <g key={`dot-${item.key}`}>
+              {/* Outer halo */}
+              <circle cx={pt.x} cy={pt.y} r="7" fill="url(#dotGlow)" />
+              {/* Core vertex */}
+              <circle
+                cx={pt.x}
+                cy={pt.y}
+                r="4"
+                fill="#00D1FF"
+                stroke="#0F2A42"
+                strokeWidth="1.75"
+              />
+            </g>
           );
         })}
       </svg>
+
+      {/* Legend below graph */}
+      <figcaption className="flex flex-wrap items-center justify-center gap-5 pt-3 text-xs text-[#5A6F83]">
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-block w-3.5 h-1.5 bg-[#1E5079] rounded-sm" />
+          <span className="font-medium text-[#0F2A42]">ผลคะแนนของนักเรียน</span>
+        </span>
+        {showBenchmark && (
+          <span className="inline-flex items-center gap-2">
+            <span className="inline-block w-4 h-0 border-t-2 border-dashed border-[#94A3B8]" />
+            <span className="text-[#64748B]">เกณฑ์มาตรฐานอ้างอิง (70%)</span>
+          </span>
+        )}
+      </figcaption>
     </figure>
   );
 }

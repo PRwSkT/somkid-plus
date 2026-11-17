@@ -1,8 +1,6 @@
-import { Suspense } from "react";
 import Link from "next/link";
 import { getSiteContent } from "@/lib/site-content";
 import { SkillRadarChart } from "@/components/SkillRadarChart";
-import { GoogleCodeRedirect } from "@/components/GoogleCodeRedirect";
 
 const SAMPLE_RADAR_SCORES = {
   conceptual: 78,
@@ -28,9 +26,6 @@ export default async function HomePage() {
 
   return (
     <div>
-      <Suspense fallback={null}>
-        <GoogleCodeRedirect />
-      </Suspense>
       {/* Hero */}
       <section className="relative overflow-hidden bg-white border-b border-[#D3DEE8]">
         <span

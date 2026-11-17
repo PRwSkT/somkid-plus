@@ -313,12 +313,27 @@ export function MockExamClient({
     const init = async () => {
       let restored: PersistedExamState | null = null;
       try {
-        const raw = sessionStorage.getItem(SESSION_KEY);
+        const raw =
+          localStorage.getItem(SESSION_KEY) ||
+          sessionStorage.getItem(SESSION_KEY);
         if (raw) {
           restored = JSON.parse(raw) as PersistedExamState;
         }
       } catch {
-        // ignore malformed session storage
+        // ignore malformed storage
+      }
+
+      if (!restored && typeof document !== "undefined") {
+        const match = document.cookie.match(/sk_exam_backup=([^;]+)/);
+        if (match) {
+          try {
+            restored = JSON.parse(
+              decodeURIComponent(match[1])
+            ) as PersistedExamState;
+          } catch {
+            // ignore
+          }
+        }
       }
 
       if (!active) return;
@@ -330,6 +345,15 @@ export function MockExamClient({
         if (typeof restored.elapsedSeconds === "number")
           setElapsedSeconds(restored.elapsedSeconds);
       }
+
+      const hasAnswers =
+        Boolean(restored?.answers) &&
+        Object.keys(restored?.answers || {}).length > 0;
+      const isFinished = Boolean(
+        restored?.completedAt ||
+          (restored?.answers &&
+            Object.keys(restored.answers).length >= 6)
+      );
 
       // 1. Check direct Google OAuth session first (somkidplus project)
       try {
@@ -346,8 +370,10 @@ export function MockExamClient({
               avatarUrl: meData.user.picture || undefined,
               isDemo: false,
             });
-            if (restored?.completedAt) {
-              setStep("enrichment");
+
+            // Show results immediately if answers exist, or let them resume
+            if (isFinished || hasAnswers) {
+              setStep("results");
             }
             return;
           }
@@ -375,14 +401,18 @@ export function MockExamClient({
               undefined,
             isDemo: false,
           });
-          if (restored?.completedAt) {
-            setStep("enrichment");
+          if (isFinished || hasAnswers) {
+            setStep("results");
           }
-        } else if (restored?.completedAt) {
+        } else if (isFinished) {
           setStep("oauth_gate");
+        } else if (hasAnswers) {
+          setStep("exam");
         }
-      } else if (restored?.completedAt) {
+      } else if (isFinished) {
         setStep("oauth_gate");
+      } else if (hasAnswers) {
+        setStep("exam");
       }
     };
 
@@ -406,7 +436,7 @@ export function MockExamClient({
     setStep("oauth_gate");
   }
 
-  // Persist exam progress on changes
+  // Persist exam progress on changes (multi-layer: localStorage + sessionStorage + cookie backup)
   const persistState = useCallback(
     (
       nextAnswers: Record<string, unknown>,
@@ -422,7 +452,14 @@ export function MockExamClient({
           elapsedSeconds: nextElapsed,
           completedAt,
         };
-        sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload));
+        const raw = JSON.stringify(payload);
+        localStorage.setItem(SESSION_KEY, raw);
+        sessionStorage.setItem(SESSION_KEY, raw);
+        if (typeof document !== "undefined") {
+          document.cookie = `sk_exam_backup=${encodeURIComponent(
+            raw
+          )}; path=/; max-age=86400; SameSite=Lax`;
+        }
       } catch {
         // ignore storage quota errors
       }
@@ -527,9 +564,10 @@ export function MockExamClient({
       setCurrentIndex(nextIdx);
       persistState(answers, nextIdx, elapsedSeconds);
     } else {
-      persistState(answers, currentIndex, elapsedSeconds, new Date().toISOString());
+      const completedAt = new Date().toISOString();
+      persistState(answers, currentIndex, elapsedSeconds, completedAt);
       if (authUser) {
-        setStep("enrichment");
+        setStep("results");
       } else {
         setStep("oauth_gate");
       }
@@ -538,7 +576,8 @@ export function MockExamClient({
 
   async function handleGoogleOAuth() {
     setOauthError(null);
-    persistState(answers, currentIndex, elapsedSeconds, new Date().toISOString());
+    const completedAt = new Date().toISOString();
+    persistState(answers, currentIndex, elapsedSeconds, completedAt);
 
     // Direct Google OAuth route using somkidplus credentials (no SV-Portal branding)
     window.location.href = `/api/auth/google?next=/mock-exam`;
@@ -551,7 +590,7 @@ export function MockExamClient({
       email: "parent.demo@somkidvittaya.ac.th",
       isDemo: true,
     });
-    setStep("enrichment");
+    setStep("results");
   }
 
   async function handleEnrichmentSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -1038,10 +1077,10 @@ export function MockExamClient({
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
-                  onClick={() => setStep("enrichment")}
+                  onClick={() => setStep("results")}
                   className="flex-1 bg-[#1E5079] hover:bg-[#143E61] text-white font-semibold py-3.5 px-6 text-sm transition-colors text-center"
                 >
-                  ดำเนินการต่อด้วยบัญชีนี้ →
+                  ดูผลคะแนนและกราฟ 5 มิติทันที →
                 </button>
                 <button
                   type="button"
@@ -1079,11 +1118,13 @@ export function MockExamClient({
                 </svg>
                 <span>ดำเนินการต่อด้วย Google (Gmail) เพื่อดูผลวิเคราะห์</span>
               </button>
-              {!supabaseConfigured && (
-                <p className="font-mono-tech text-sm text-[#5A6F83] text-center">
-                  Demo Mode: ยังไม่ได้ตั้งค่า Supabase URL — คลิกปุ่มด้านบนเพื่อจำลองการล็อกอิน Gmail และทดสอบขั้นตอนถัดไปได้ทันที
-                </p>
-              )}
+              <button
+                type="button"
+                onClick={handleDemoContinue}
+                className="w-full text-center text-xs text-[#5A6F83] hover:text-[#1E5079] font-medium pt-2 transition-colors cursor-pointer"
+              >
+                หรือดูผลวิเคราะห์ทันทีโดยไม่ต้องล็อกอิน (โหมดทดสอบ) →
+              </button>
             </div>
           )}
 
@@ -1392,6 +1433,77 @@ export function MockExamClient({
             </div>
           </section>
           )}
+
+          {/* Consultation & Full PDF Request Card */}
+          <section className="bg-[#F8FAFC] border-2 border-[#1E5079] p-6 sm:p-8 space-y-4">
+            <div className="max-w-3xl space-y-1">
+              <span className="font-mono-tech text-xs text-[#0B7490] font-semibold uppercase tracking-wider">
+                Full Diagnostic PDF & Academic Consultation
+              </span>
+              <h3 className="font-display text-2xl text-[#0F2A42]">
+                รับไฟล์รายงานผลวิเคราะห์ 5 มิติฉบับสมบูรณ์ (PDF) และปรึกษาอาจารย์ Somkid+
+              </h3>
+              <p className="text-sm text-[#5A6F83]">
+                กรอกเบอร์โทรศัพท์และ LINE ID เพื่อให้ทีมวิชาการจัดส่งรายงาน PDF ฉบับเต็ม พร้อมวิเคราะห์แผนการเรียนปิดจุดอ่อนเฉพาะบุคคล
+              </p>
+            </div>
+
+            {webhookStatus ? (
+              <div className="p-4 bg-[#e6f4ea] border-l-4 border-[#188038] text-[#188038] text-sm">
+                <p className="font-semibold">บันทึกข้อมูลเรียบร้อยแล้ว</p>
+                <p className="text-xs mt-0.5">{webhookStatus}</p>
+              </div>
+            ) : (
+              <form onSubmit={handleEnrichmentSubmit} className="grid grid-cols-1 sm:grid-cols-12 gap-4 pt-2">
+                <div className="sm:col-span-4">
+                  <label htmlFor="res-phone" className="block text-xs font-semibold text-[#0F2A42] mb-1">
+                    เบอร์โทรศัพท์ผู้ปกครอง *
+                  </label>
+                  <input
+                    id="res-phone"
+                    name="phone"
+                    type="tel"
+                    required
+                    pattern="[0-9\-\s\+]{9,15}"
+                    placeholder="08X-XXX-XXXX"
+                    className="somkid-input text-sm py-2.5"
+                  />
+                </div>
+                <div className="sm:col-span-4">
+                  <label htmlFor="res-line" className="block text-xs font-semibold text-[#0F2A42] mb-1">
+                    LINE ID (สำหรับส่ง PDF)
+                  </label>
+                  <input
+                    id="res-line"
+                    name="lineId"
+                    type="text"
+                    placeholder="@lineid"
+                    className="somkid-input text-sm py-2.5"
+                  />
+                </div>
+                <div className="sm:col-span-4 flex items-end">
+                  <button
+                    type="submit"
+                    disabled={submittingLead}
+                    className="w-full bg-[#1E5079] hover:bg-[#143E61] disabled:opacity-60 text-white font-semibold py-2.5 px-4 text-sm transition-colors cursor-pointer"
+                  >
+                    {submittingLead ? "กำลังส่ง..." : "ส่งรายงานเข้า LINE →"}
+                  </button>
+                </div>
+                <div className="sm:col-span-12 flex items-center gap-2 pt-1 text-xs text-[#5A6F83]">
+                  <input id="res-pdpa" name="pdpaConsent" type="checkbox" required defaultChecked className="accent-[#1E5079]" />
+                  <label htmlFor="res-pdpa">
+                    ยินยอมให้ Somkid+ ติดต่อกลับเพื่อส่งผลสอบและให้คำปรึกษาตามนโยบาย PDPA
+                  </label>
+                </div>
+                {leadError && (
+                  <div className="sm:col-span-12 text-xs text-[#B31B1B] bg-[#fdf2f2] p-2 border border-[#B31B1B]">
+                    {leadError}
+                  </div>
+                )}
+              </form>
+            )}
+          </section>
 
           {/* Answer Key & Explanations */}
           <section className="space-y-4">

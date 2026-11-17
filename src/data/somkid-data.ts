@@ -75,12 +75,38 @@ export const SKILL_DIMENSION_LABELS: Record<SkillDimensionKey, string> = {
   expression: "การสื่อสารและการตีความ",
 };
 
+export type QuestionType =
+  | "single_choice"
+  | "multiple_choice"
+  | "numeric_input"
+  | "true_false";
+
+export type QuestionDifficulty = "foundation" | "intermediate" | "challenge";
+
+export type DiagramType =
+  | "none"
+  | "geometry_triangle"
+  | "bar_model"
+  | "science_beaker"
+  | "circuit";
+
 export interface MockQuestion {
   id: string;
+  type?: QuestionType;
+  difficulty?: QuestionDifficulty;
+  topic?: string;
   dimension: SkillDimensionKey;
+  contextPassage?: string;
+  imageUrl?: string;
+  diagramType?: DiagramType;
   prompt: string;
-  options: string[];
-  correctIndex: number;
+  hint?: string;
+  options?: string[];
+  correctIndex?: number;
+  correctIndices?: number[];
+  correctAnswer?: string;
+  acceptedAnswers?: string[];
+  unit?: string;
   explanation: string;
 }
 
@@ -346,11 +372,16 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "m2",
+        type: "numeric_input",
+        topic: "ร้อยละและส่วนลด",
+        difficulty: "intermediate",
         dimension: "applied",
-        prompt: "ร้านหนังสือลดราคาสมุด 20% จากราคาป้าย 150 บาท หากซื้อ 3 เล่มต้องจ่ายเงินทั้งหมดกี่บาท",
-        options: ["320 บาท", "360 บาท", "380 บาท", "405 บาท"],
-        correctIndex: 1,
-        explanation: "ราคาหลังลด 20% คือ 150 × 0.8 = 120 บาทต่อเล่ม ซื้อ 3 เล่มเท่ากับ 360 บาท",
+        prompt: "ร้านหนังสือลดราคาสมุด 20% จากราคาป้าย 150 บาท หากซื้อ 3 เล่ม ต้องจ่ายเงินทั้งหมดกี่บาท (พิมพ์คำตอบเป็นตัวเลข)",
+        unit: "บาท",
+        correctAnswer: "360",
+        acceptedAnswers: ["360", "360 บาท"],
+        hint: "ราคาหลังลด 20% หมายถึงจ่ายเพียง 80% ของราคาป้าย (150 × 0.8) แล้วคูณด้วยจำนวน 3 เล่ม",
+        explanation: "ราคาหลังลด 20% คือ 150 × 0.8 = 120 บาทต่อเล่ม ซื้อ 3 เล่มจึงเท่ากับ 120 × 3 = 360 บาท",
       },
       {
         id: "m3",
@@ -386,11 +417,16 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "m7",
+        type: "single_choice",
+        diagramType: "bar_model",
+        topic: "เศษส่วนและปริมาตร",
+        difficulty: "intermediate",
         dimension: "applied",
-        prompt: "ถังน้ำมีน้ำอยู่ 3/5 ของถัง เมื่อเติมน้ำเพิ่มอีก 24 ลิตร น้ำจะเต็มถังพอดี ถังนี้จุน้ำได้กี่ลิตร",
+        prompt: "จากแผนภาพ Bar Model ด้านบน ถังน้ำมีน้ำอยู่ 3/5 ของถัง เมื่อเติมน้ำเพิ่มอีก 24 ลิตร น้ำจะเต็มถังพอดี ถังนี้มีความจุทั้งหมดกี่ลิตร",
         options: ["40 ลิตร", "50 ลิตร", "60 ลิตร", "75 ลิตร"],
         correctIndex: 2,
-        explanation: "ส่วนที่ขาดคือ 2/5 ของถัง เท่ากับ 24 ลิตร ดังนั้น 1/5 = 12 ลิตร และเต็มถัง = 60 ลิตร",
+        hint: "สังเกตจากแท่ง Bar Model: ส่วนที่ยังว่างอยู่คือ 2 ช่อง (2/5) ซึ่งมีค่าเท่ากับ 24 ลิตร แปลว่า 1 ช่อง (1/5) มีค่ากี่ลิตร?",
+        explanation: "ส่วนที่ขาดคือ 2/5 ของถัง เท่ากับ 24 ลิตร ดังนั้น 1 ส่วน (1/5) = 12 ลิตร เมื่อเต็มถังมี 5 ส่วน จึงจุได้ 12 × 5 = 60 ลิตร",
       },
       {
         id: "m8",
@@ -402,10 +438,15 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "m9",
+        type: "single_choice",
+        diagramType: "geometry_triangle",
+        topic: "เรขาคณิตและพื้นที่",
+        difficulty: "foundation",
         dimension: "accuracy",
-        prompt: "สามเหลี่ยมมุมฉากมีฐานยาว 14 ซม. และสูง 9 ซม. พื้นที่ของสามเหลี่ยมนี้คือเท่าใด",
+        prompt: "จากรูปสามเหลี่ยมมุมฉากในแผนภาพด้านบน มีความยาวฐาน 14 ซม. และความสูง 9 ซม. พื้นที่ของสามเหลี่ยมนี้คือข้อใด",
         options: ["54 ตร.ซม.", "63 ตร.ซม.", "72 ตร.ซม.", "126 ตร.ซม."],
         correctIndex: 1,
+        hint: "สูตรคำนวณพื้นที่สามเหลี่ยม = 1/2 × ฐาน × สูง",
         explanation: "พื้นที่ = 1/2 × 14 × 9 = 63 ตารางเซนติเมตร",
       },
       {
@@ -426,11 +467,15 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "m12",
+        type: "true_false",
+        topic: "ตรรกะและการจับคู่",
+        difficulty: "intermediate",
         dimension: "logic",
-        prompt: "ในการแข่งขันหมากรุก 5 คน พบกันหมดทุกคนคนละ 1 ครั้ง จะมีการแข่งขันเกิดขึ้นทั้งหมดกี่คู่",
-        options: ["8 คู่", "10 คู่", "12 คู่", "20 คู่"],
-        correctIndex: 1,
-        explanation: "(5 × 4) ÷ 2 = 10 คู่",
+        prompt: "พิจารณาข้อความ: 'ในการแข่งขันหมากรุกที่มีผู้แข่งขัน 5 คน และทุกคนต้องแข่งแบบพบกันหมดคนละ 1 ครั้ง จะเกิดการแข่งขันทั้งหมด 10 คู่' ข้อความนี้ จริง หรือ เท็จ",
+        options: ["จริง / ถูกต้อง (True)", "ไม่จริง / ผิด (False)"],
+        correctIndex: 0,
+        hint: "สูตรคำนวณการจับคู่พบกันหมด: n × (n − 1) ÷ 2",
+        explanation: "สูตรพบกันหมดคือ n(n−1)/2 = 5×4/2 = 10 คู่พอดี ดังนั้นข้อความนี้จึงเป็น 'จริง'",
       },
     ],
   },
@@ -479,24 +524,33 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "e4",
+        type: "single_choice",
+        topic: "Reading Comprehension",
+        difficulty: "intermediate",
         dimension: "logic",
-        prompt: "Passage: 'Although solar panels reduce monthly electricity bills, their initial installation cost remains a barrier for small schools.' What is the author's main point?",
+        contextPassage: "Although solar panels reduce monthly electricity bills in the long run, their initial installation cost remains a major barrier for small schools with limited budgets. Many school administrators are now exploring government clean-energy subsidy grants to help bridge the funding gap.",
+        prompt: "Based on the passage above, what is the author's primary argument regarding solar panels in small schools?",
         options: [
           "Solar panels do not save electricity.",
-          "Small schools prefer wind power.",
-          "Upfront cost limits adoption despite long-term savings.",
-          "Electricity bills are rising every year.",
+          "Small schools prefer wind power over solar.",
+          "High upfront cost limits adoption despite long-term financial savings.",
+          "Electricity bills are rising too fast for schools to manage.",
         ],
         correctIndex: 2,
-        explanation: "The contrast ('Although...') highlights long-term savings vs. high initial cost.",
+        hint: "Notice the contrasting ideas between 'reduce bills in the long run' and 'initial installation cost remains a major barrier'.",
+        explanation: "The contrast clause ('Although...') emphasizes that despite long-term energy savings, high upfront cost is the primary obstacle.",
       },
       {
         id: "e5",
+        type: "true_false",
+        topic: "Fact-Checking from Passage",
+        difficulty: "foundation",
         dimension: "accuracy",
-        prompt: "Select the correct preposition: 'The science fair is scheduled ______ Friday morning ______ 9:00 a.m.'",
-        options: ["in / at", "on / at", "at / on", "on / in"],
+        prompt: "From the solar panel passage, evaluate this statement: 'Small schools struggle with solar panels because solar technology does not reduce electricity bills.' (True or False)",
+        options: ["True", "False"],
         correctIndex: 1,
-        explanation: "Use 'on' for specific days/parts of a specific day ('on Friday morning') and 'at' for exact clock time.",
+        hint: "Check the very first line of the passage carefully.",
+        explanation: "The passage explicitly states 'solar panels reduce monthly electricity bills in the long run'. The real barrier is the initial installation cost, so the statement is False.",
       },
       {
         id: "e6",
@@ -534,16 +588,20 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "e9",
+        type: "multiple_choice",
+        topic: "Grammar & Error Identification",
+        difficulty: "challenge",
         dimension: "accuracy",
-        prompt: "Identify the error: 'Every students in the robotics club needs to bring their own laptop.'",
+        prompt: "Which TWO of the following sentences contain grammatical errors? (Select 2 options)",
         options: [
-          "Every students",
-          "in the robotics club",
-          "needs to bring",
-          "own laptop",
+          "Every students in the robotics club needs to bring their own laptop.",
+          "Neither the teacher nor the students were late for the lecture.",
+          "She has been waiting for the school bus since thirty minutes.",
+          "The science fair was organized by the senior secondary students.",
         ],
-        correctIndex: 0,
-        explanation: "'Every' is followed by a singular countable noun: 'Every student'.",
+        correctIndices: [0, 2],
+        hint: "Check 'Every + noun' and 'since vs. for' when talking about a duration of time.",
+        explanation: "Options 1 and 3 contain errors: (1) 'Every' requires a singular noun ('Every student'), and (3) a time duration requires 'for' ('for thirty minutes', not 'since').",
       },
       {
         id: "e10",
@@ -600,11 +658,16 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "s2",
+        type: "numeric_input",
+        topic: "ฟิสิกส์ แรงและการเคลื่อนที่",
+        difficulty: "intermediate",
         dimension: "applied",
-        prompt: "วัตถุมวล 4 กิโลกรัม ถูกแรงลัพธ์ขนาด 20 นิวตันกระทำในแนวราบ วัตถุจะเคลื่อนที่ด้วยความเร่งเท่าใด",
-        options: ["0.2 m/s²", "4 m/s²", "5 m/s²", "80 m/s²"],
-        correctIndex: 2,
-        explanation: "จาก F = ma จะได้ a = F/m = 20 / 4 = 5 m/s²",
+        prompt: "วัตถุมวล 4 กิโลกรัม ถูกแรงลัพธ์ขนาด 20 นิวตันกระทำในแนวราบ วัตถุจะเคลื่อนที่ด้วยความเร่งเท่าใดในหน่วย m/s² (พิมพ์คำตอบเป็นตัวเลข)",
+        unit: "m/s²",
+        correctAnswer: "5",
+        acceptedAnswers: ["5", "5 m/s²"],
+        hint: "ใช้กฎการเคลื่อนที่ข้อที่ 2 ของนิวตัน: F = ma ดังนั้น a = F ÷ m",
+        explanation: "จากสูตร F = ma จะได้ a = F / m = 20 / 4 = 5 m/s²",
       },
       {
         id: "s3",
@@ -616,29 +679,34 @@ export const SEED_EXAM_TRACKS: MockExamTrack[] = [
       },
       {
         id: "s4",
+        type: "single_choice",
+        diagramType: "science_beaker",
+        topic: "ทักษะปฏิบัติการและการวัด",
+        difficulty: "foundation",
         dimension: "accuracy",
-        prompt: "สารละลายที่มีค่า pH = 3 เมื่อทดสอบด้วยกระดาษลิตมัสสีน้ำเงินและสีแดง จะเกิดผลอย่างไร",
-        options: [
-          "น้ำเงินเปลี่ยนเป็นแดง / แดงไม่เปลี่ยน",
-          "แดงเปลี่ยนเป็นน้ำเงิน / น้ำเงินไม่เปลี่ยน",
-          "ไม่เปลี่ยนสีทั้งคู่",
-          "เปลี่ยนเป็นสีเขียวทั้งคู่",
-        ],
-        correctIndex: 0,
-        explanation: "pH = 3 มีสมบัติเป็นกรด จึงเปลี่ยนลิตมัสสีน้ำเงินเป็นสีแดง",
+        prompt: "สังเกตระดับของเหลวในกระบอกตวงจากแผนภาพด้านบน โดยอ่านค่าที่ท้องคลื่นของเหลว (Meniscus) ปริมาตรของสารละลายนี้คือเท่าใด",
+        options: ["60 ml", "65 ml", "68 ml", "70 ml"],
+        correctIndex: 1,
+        hint: "การอ่านปริมาตรของเหลวที่ส่วนโค้งเว้าลง ให้อ่านขีดที่จุดต่ำสุดของท้องน้ำ",
+        explanation: "การอ่านปริมาตรของเหลวในกระบอกตวงต้องอ่านระดับขีดที่จุดต่ำสุดของท้องน้ำ (Meniscus) ในระดับสายตา ซึ่งตรงกับ 65 ml พอดี",
       },
       {
         id: "s5",
+        type: "single_choice",
+        diagramType: "circuit",
+        topic: "ฟิสิกส์ วงจรไฟฟ้า",
+        difficulty: "foundation",
         dimension: "logic",
-        prompt: "หากต่อหลอดไฟ 2 ดวงแบบอนุกรมแล้วหลอดหนึ่งไส้ขาด อีกหลอดจะเป็นอย่างไร",
+        prompt: "จากแผนผังวงจรไฟฟ้าด้านบน หากสวิตช์ยังอยู่ในสถานะ 'สวิตช์เปิด (Open)' หลอดไฟจะทำงานอย่างไร",
         options: [
-          "สว่างมากขึ้น",
-          "สว่างเท่าเดิม",
-          "ดับตามไปด้วย",
-          "กระพริบเป็นจังหวะ",
+          "หลอดไฟดับ เพราะวงจรเปิด กระแสไฟฟ้าไหลไม่ครบวงจร",
+          "หลอดไฟสว่างตามปกติ",
+          "หลอดไฟกะพริบเป็นจังหวะ",
+          "หลอดไฟสว่างหรี่ลงครึ่งหนึ่ง",
         ],
-        correctIndex: 2,
-        explanation: "วงจรอนุกรมมีทางเดินกระแสไฟเพียงเส้นทางเดียว เมื่อวงจรขาดกระแสไฟจะไม่ไหล",
+        correctIndex: 0,
+        hint: "พิจารณาว่าสวิตช์เปิด (Open Switch) หมายถึงสะพานไฟเชื่อมต่อกันหรือขาดจากกัน?",
+        explanation: "สวิตช์เปิด (Open Switch) หมายถึงวงจรไฟฟ้าขาด กระแสไฟฟ้าไม่สามารถไหลผ่านครบวงจรได้ หลอดไฟจึงดับ",
       },
       {
         id: "s6",

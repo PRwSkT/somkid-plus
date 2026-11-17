@@ -14,13 +14,28 @@ export default async function MockExamPage() {
     .filter((t) => t.published)
     .map((t) => ({
       ...t,
-      questions: t.questions.filter(
-        (q) =>
-          q.prompt.trim() &&
-          q.options.filter((o) => o.trim()).length >= 2 &&
+      questions: t.questions.filter((q) => {
+        if (!q.prompt?.trim()) return false;
+        const qType = q.type || "single_choice";
+        if (qType === "numeric_input") {
+          return Boolean(q.correctAnswer !== undefined && String(q.correctAnswer).trim());
+        }
+        if (qType === "multiple_choice") {
+          return (
+            (q.options?.filter((o) => o.trim()).length ?? 0) >= 2 &&
+            ((q.correctIndices?.length ?? 0) > 0 || q.correctIndex !== undefined)
+          );
+        }
+        if (qType === "true_false") {
+          return q.correctIndex !== undefined;
+        }
+        return (
+          (q.options?.filter((o) => o.trim()).length ?? 0) >= 2 &&
+          q.correctIndex !== undefined &&
           q.correctIndex >= 0 &&
-          q.correctIndex < q.options.length
-      ),
+          q.correctIndex < (q.options?.length ?? 0)
+        );
+      }),
     }))
     .filter((t) => t.questions.length > 0);
 

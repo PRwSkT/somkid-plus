@@ -7,7 +7,9 @@ import {
   TIER_MATRIX,
   classifyScoreTier,
   type AcademicCourse,
+  type DiagramType,
   type MockExamTrack,
+  type MockQuestion,
   type SkillDimensionKey,
 } from "@/data/somkid-data";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
@@ -20,7 +22,7 @@ type FunnelStep = "select" | "exam" | "oauth_gate" | "enrichment" | "results";
 
 interface PersistedExamState {
   trackId: string;
-  answers: Record<string, number>;
+  answers: Record<string, unknown>;
   currentIndex: number;
   elapsedSeconds: number;
   completedAt?: string;
@@ -33,6 +35,241 @@ interface AuthIdentity {
   isDemo: boolean;
 }
 
+function isAnswerCorrect(q: MockQuestion, userVal: unknown): boolean {
+  if (userVal === undefined || userVal === null) return false;
+  const qType = q.type || "single_choice";
+
+  if (qType === "single_choice" || qType === "true_false") {
+    return userVal === q.correctIndex;
+  }
+
+  if (qType === "multiple_choice") {
+    if (!Array.isArray(userVal)) return false;
+    const target =
+      q.correctIndices && q.correctIndices.length > 0
+        ? q.correctIndices
+        : [q.correctIndex ?? 0];
+    if (userVal.length !== target.length) return false;
+    const s1 = [...userVal].map(Number).sort();
+    const s2 = [...target].map(Number).sort();
+    return s1.every((v, i) => v === s2[i]);
+  }
+
+  if (qType === "numeric_input") {
+    const raw = String(userVal).trim();
+    if (!raw) return false;
+    const expected = String(q.correctAnswer ?? "").trim();
+    if (raw.toLowerCase() === expected.toLowerCase()) return true;
+    if (
+      q.acceptedAnswers &&
+      q.acceptedAnswers.some(
+        (a) => a.trim().toLowerCase() === raw.toLowerCase()
+      )
+    ) {
+      return true;
+    }
+    const numUser = parseFloat(raw.replace(/,/g, ""));
+    const numExp = parseFloat(expected.replace(/,/g, ""));
+    if (!isNaN(numUser) && !isNaN(numExp) && Math.abs(numUser - numExp) < 0.001) {
+      return true;
+    }
+    return false;
+  }
+
+  return false;
+}
+
+function isQuestionAnswered(q: MockQuestion, userVal: unknown): boolean {
+  if (userVal === undefined || userVal === null) return false;
+  const qType = q.type || "single_choice";
+  if (qType === "single_choice" || qType === "true_false") {
+    return typeof userVal === "number";
+  }
+  if (qType === "multiple_choice") {
+    return Array.isArray(userVal) && userVal.length > 0;
+  }
+  if (qType === "numeric_input") {
+    return typeof userVal === "string" && userVal.trim().length > 0;
+  }
+  return false;
+}
+
+function formatUserAnswer(q: MockQuestion, userVal: unknown): string {
+  if (userVal === undefined || userVal === null) return "(ยังไม่ได้ตอบ)";
+  const qType = q.type || "single_choice";
+  if (qType === "true_false") {
+    return userVal === 0 ? "จริง / ถูกต้อง" : "ไม่จริง / ผิด";
+  }
+  if (qType === "numeric_input") {
+    return `${userVal} ${q.unit ?? ""}`.trim();
+  }
+  if (qType === "multiple_choice") {
+    if (!Array.isArray(userVal)) return String(userVal);
+    return userVal
+      .map((i) => q.options?.[Number(i)] ?? `ตัวเลือก ${Number(i) + 1}`)
+      .join(", ");
+  }
+  return typeof userVal === "number"
+    ? q.options?.[userVal] ?? `ตัวเลือก ${userVal + 1}`
+    : String(userVal);
+}
+
+function formatCorrectAnswer(q: MockQuestion): string {
+  const qType = q.type || "single_choice";
+  if (qType === "true_false") {
+    return q.correctIndex === 0 ? "จริง / ถูกต้อง" : "ไม่จริง / ผิด";
+  }
+  if (qType === "numeric_input") {
+    return `${q.correctAnswer ?? "-"} ${q.unit ?? ""}`.trim();
+  }
+  if (qType === "multiple_choice") {
+    const target =
+      q.correctIndices && q.correctIndices.length > 0
+        ? q.correctIndices
+        : [q.correctIndex ?? 0];
+    return target
+      .map((i) => q.options?.[i] ?? `ตัวเลือก ${i + 1}`)
+      .join(", ");
+  }
+  return q.options?.[q.correctIndex ?? 0] ?? "-";
+}
+
+function QuestionDiagram({ type }: { type?: DiagramType }) {
+  if (!type || type === "none") return null;
+
+  if (type === "bar_model") {
+    return (
+      <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-4 rounded-sm my-3">
+        <p className="text-xs font-mono-tech text-[#1E5079] mb-2 font-semibold">
+          📊 Bar Model (แบบจำลองแท่งสัดส่วนเศษส่วน):
+        </p>
+        <svg viewBox="0 0 500 120" className="w-full max-w-lg h-auto mx-auto select-none" fill="none">
+          <rect x="20" y="25" width="460" height="48" rx="4" fill="#FFFFFF" stroke="#0F2A42" strokeWidth="2" />
+          <rect x="20" y="25" width="276" height="48" fill="#00D1FF" fillOpacity="0.25" stroke="#00C7FF" strokeWidth="2" />
+          {[1, 2, 3, 4].map((i) => (
+            <line key={i} x1={20 + i * 92} y1="25" x2={20 + i * 92} y2="73" stroke="#0F2A42" strokeWidth="1.5" strokeDasharray="3 3" />
+          ))}
+          <path d="M 22 18 Q 158 5 294 18" fill="none" stroke="#0094B8" strokeWidth="1.5" />
+          <text x="158" y="14" fill="#007A99" fontSize="11" fontWeight="bold" textAnchor="middle">มีน้ำอยู่ 3/5 ของถัง</text>
+          <path d="M 298 80 Q 390 92 478 80" fill="none" stroke="#D9381E" strokeWidth="1.5" />
+          <text x="388" y="106" fill="#B31B1B" fontSize="11" fontWeight="bold" textAnchor="middle">เติมเพิ่มอีก 24 ลิตร (2/5)</text>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <text key={i} x={20 + i * 92 + 46} y="54" fill="#0F2A42" fontSize="12" fontWeight="600" textAnchor="middle">1/5</text>
+          ))}
+        </svg>
+      </div>
+    );
+  }
+
+  if (type === "geometry_triangle") {
+    return (
+      <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-4 rounded-sm my-3">
+        <p className="text-xs font-mono-tech text-[#1E5079] mb-2 font-semibold">
+          📐 แผนภาพเรขาคณิตสามเหลี่ยมมุมฉาก:
+        </p>
+        <svg viewBox="0 0 360 160" className="w-full max-w-md h-auto mx-auto select-none" fill="none">
+          <polygon points="50,130 290,130 50,30" fill="#E0F8FF" fillOpacity="0.5" stroke="#1E5079" strokeWidth="2.5" />
+          <rect x="50" y="112" width="18" height="18" fill="none" stroke="#1E5079" strokeWidth="1.5" />
+          <text x="170" y="148" fill="#0F2A42" fontSize="12" fontWeight="bold" textAnchor="middle">ฐาน = 14 ซม.</text>
+          <text x="32" y="85" fill="#0F2A42" fontSize="12" fontWeight="bold" textAnchor="end">สูง = 9 ซม.</text>
+          <circle cx="50" cy="130" r="3" fill="#1E5079" />
+          <circle cx="290" cy="130" r="3" fill="#1E5079" />
+          <circle cx="50" cy="30" r="3" fill="#1E5079" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (type === "science_beaker") {
+    return (
+      <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-4 rounded-sm my-3">
+        <p className="text-xs font-mono-tech text-[#1E5079] mb-2 font-semibold">
+          🧪 กระบอกตวงวัดปริมาตรของเหลว (Graduated Cylinder):
+        </p>
+        <svg viewBox="0 0 260 180" className="w-full max-w-xs h-auto mx-auto select-none" fill="none">
+          <rect x="100" y="20" width="60" height="140" rx="3" fill="#FFFFFF" stroke="#0F2A42" strokeWidth="2" />
+          <rect x="80" y="155" width="100" height="10" rx="2" fill="#5A6F83" />
+          <rect x="101" y="66" width="58" height="93" fill="#00D1FF" fillOpacity="0.35" />
+          <path d="M 101 66 Q 130 69 159 66" fill="none" stroke="#0094B8" strokeWidth="2" />
+          {[100, 80, 60, 40, 20].map((ml, idx) => {
+            const y = 25 + idx * 26;
+            return (
+              <g key={ml}>
+                <line x1="145" y1={y} x2="160" y2={y} stroke="#0F2A42" strokeWidth="1.5" />
+                <text x="175" y={y + 4} fill="#5A6F83" fontSize="10" fontFamily="monospace">{ml}</text>
+              </g>
+            );
+          })}
+          <line x1="75" y1="66" x2="98" y2="66" stroke="#D9381E" strokeWidth="1.5" strokeDasharray="2 2" />
+          <text x="70" y="69" fill="#B31B1B" fontSize="11" fontWeight="bold" textAnchor="end">ระดับของเหลว</text>
+        </svg>
+      </div>
+    );
+  }
+
+  if (type === "circuit") {
+    return (
+      <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-4 rounded-sm my-3">
+        <p className="text-xs font-mono-tech text-[#1E5079] mb-2 font-semibold">
+          ⚡ แผนผังวงจรไฟฟ้าอย่างง่าย (Electrical Circuit):
+        </p>
+        <svg viewBox="0 0 340 140" className="w-full max-w-sm h-auto mx-auto select-none" fill="none">
+          <rect x="40" y="25" width="260" height="90" fill="none" stroke="#0F2A42" strokeWidth="2" />
+          <rect x="150" y="20" width="40" height="10" fill="#FFFFFF" />
+          <line x1="160" y1="18" x2="160" y2="32" stroke="#1E5079" strokeWidth="3" />
+          <line x1="175" y1="21" x2="175" y2="29" stroke="#1E5079" strokeWidth="1.5" />
+          <text x="153" y="14" fill="#0F2A42" fontSize="10" fontWeight="bold">+</text>
+          <text x="180" y="14" fill="#0F2A42" fontSize="10" fontWeight="bold">−</text>
+          <circle cx="170" cy="115" r="14" fill="#FFF9D2" stroke="#0F2A42" strokeWidth="2" />
+          <line x1="163" y1="108" x2="177" y2="122" stroke="#D97706" strokeWidth="1.5" />
+          <line x1="163" y1="122" x2="177" y2="108" stroke="#D97706" strokeWidth="1.5" />
+          <rect x="295" y="55" width="10" height="30" fill="#FFFFFF" />
+          <circle cx="300" cy="55" r="3" fill="#0F2A42" />
+          <circle cx="300" cy="85" r="3" fill="#0F2A42" />
+          <line x1="300" y1="85" x2="315" y2="60" stroke="#B31B1B" strokeWidth="2" />
+          <text x="325" y="75" fill="#B31B1B" fontSize="10" fontWeight="bold">สวิตช์เปิด (Open)</text>
+        </svg>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function PassageCard({ text }: { text?: string }) {
+  if (!text) return null;
+  return (
+    <div className="bg-[#F8FAFC] border-l-4 border-[#1E5079] p-4 text-[#2B4660] text-sm leading-relaxed my-3 space-y-1">
+      <div className="flex items-center gap-1.5 text-xs font-mono-tech text-[#1E5079] font-bold uppercase tracking-wider">
+        <span>📖 บริบท / สถานการณ์ประกอบโจทย์ (Passage Context)</span>
+      </div>
+      <p className="whitespace-pre-line text-sm text-[#0F2A42] font-serif">{text}</p>
+    </div>
+  );
+}
+
+function HintBox({ hint }: { hint?: string }) {
+  const [open, setOpen] = useState(false);
+  if (!hint) return null;
+  return (
+    <div className="pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 text-xs text-[#0B7490] hover:text-[#085468] font-medium transition-colors cursor-pointer"
+      >
+        <span>{open ? "▲ ซ่อนคำใบ้แนวคิด" : "💡 ต้องการคำใบ้แนวคิด? (คลิกเพื่อดู)"}</span>
+      </button>
+      {open && (
+        <div className="mt-2 p-3 bg-[#E0F8FF]/50 border border-[#00D1FF]/40 rounded-sm text-xs text-[#0F2A42] leading-relaxed">
+          <strong className="text-[#0B7490]">แนวคิดเบื้องต้น: </strong>
+          {hint}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MockExamClient({
   tracks,
   courses,
@@ -42,7 +279,7 @@ export function MockExamClient({
 }) {
   const [step, setStep] = useState<FunnelStep>("select");
   const [trackId, setTrackId] = useState<string>(tracks[0].id);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [currentIndex, setCurrentIndex] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [authUser, setAuthUser] = useState<AuthIdentity | null>(null);
@@ -140,7 +377,7 @@ export function MockExamClient({
   // Persist exam progress on changes
   const persistState = useCallback(
     (
-      nextAnswers: Record<string, number>,
+      nextAnswers: Record<string, unknown>,
       nextIndex: number,
       nextElapsed: number,
       completedAt?: string
@@ -183,7 +420,7 @@ export function MockExamClient({
     let correctCount = 0;
     for (const q of activeTrack.questions) {
       dimTotals[q.dimension].total += 1;
-      if (answers[q.id] === q.correctIndex) {
+      if (isAnswerCorrect(q, answers[q.id])) {
         correctCount += 1;
         dimTotals[q.dimension].correct += 1;
       }
@@ -246,8 +483,8 @@ export function MockExamClient({
     }
   }
 
-  function handleSelectOption(questionId: string, optionIdx: number) {
-    const updated = { ...answers, [questionId]: optionIdx };
+  function handleSelectOption(questionId: string, value: unknown) {
+    const updated = { ...answers, [questionId]: value };
     setAnswers(updated);
     persistState(updated, currentIndex, elapsedSeconds);
   }
@@ -358,7 +595,9 @@ export function MockExamClient({
   };
 
   const currentQuestion = activeTrack.questions[currentIndex];
-  const answeredCount = Object.keys(answers).length;
+  const answeredCount = activeTrack.questions.filter((q) =>
+    isQuestionAnswered(q, answers[q.id])
+  ).length;
   const progressPercent = Math.round(
     ((currentIndex + 1) / activeTrack.questions.length) * 100
   );
@@ -491,36 +730,202 @@ export function MockExamClient({
           </div>
 
           <fieldset className="space-y-5">
+            {/* Question Badges & Tags */}
+            <div className="flex flex-wrap items-center gap-2 pb-1">
+              {currentQuestion.topic && (
+                <span className="px-2.5 py-1 bg-[#F2F6F9] border border-[#D3DEE8] text-xs font-medium text-[#1E5079]">
+                  🏷️ {currentQuestion.topic}
+                </span>
+              )}
+              {currentQuestion.difficulty && (
+                <span
+                  className={`px-2.5 py-1 text-xs font-medium ${
+                    currentQuestion.difficulty === "foundation"
+                      ? "bg-[#e6f4ea] text-[#188038]"
+                      : currentQuestion.difficulty === "challenge"
+                      ? "bg-[#fef7e0] text-[#b06000]"
+                      : "bg-[#e8f0fe] text-[#1a73e8]"
+                  }`}
+                >
+                  {currentQuestion.difficulty === "foundation"
+                    ? "ระดับพื้นฐาน"
+                    : currentQuestion.difficulty === "challenge"
+                    ? "ระดับประยุกต์ท้าทาย (Challenge)"
+                    : "ระดับปานกลาง"}
+                </span>
+              )}
+              <span className="px-2.5 py-1 bg-[#F2F6F9] text-[#5A6F83] text-xs font-mono-tech border border-[#D3DEE8]">
+                {currentQuestion.type === "multiple_choice"
+                  ? "เลือกตอบได้หลายข้อ"
+                  : currentQuestion.type === "numeric_input"
+                  ? "อัตนัยเติมคำตอบตัวเลข"
+                  : currentQuestion.type === "true_false"
+                  ? "วิเคราะห์ถูก / ผิด"
+                  : "ปรนัย 4 ตัวเลือก"}
+              </span>
+            </div>
+
+            {/* Context Passage (if present) */}
+            <PassageCard text={currentQuestion.contextPassage} />
+
+            {/* Visual Vector Diagram (if present) */}
+            <QuestionDiagram type={currentQuestion.diagramType} />
+
+            {/* External Image (if present) */}
+            {currentQuestion.imageUrl && (
+              <div className="my-3 border border-[#D3DEE8] p-2 bg-[#F7F9FB] max-w-lg">
+                <img
+                  src={currentQuestion.imageUrl}
+                  alt={`ภาพประกอบข้อ ${currentIndex + 1}`}
+                  className="w-full h-auto object-contain"
+                />
+              </div>
+            )}
+
             <legend className="font-editorial text-xl sm:text-2xl text-[#0F2A42] leading-relaxed">
               {currentIndex + 1}. {currentQuestion.prompt}
             </legend>
 
-            <div className="space-y-3 pt-2">
-              {currentQuestion.options.map((opt, idx) => {
-                const isSelected = answers[currentQuestion.id] === idx;
-                return (
-                  <label
-                    key={idx}
-                    className={`flex items-start gap-3 p-4 border cursor-pointer transition-colors ${
-                      isSelected
-                        ? "border-[#1E5079] bg-[#F2F6F9] font-medium"
-                        : "border-[#D3DEE8] bg-white hover:bg-[#F2F6F9]/50"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`q-${currentQuestion.id}`}
-                      checked={isSelected}
-                      onChange={() => handleSelectOption(currentQuestion.id, idx)}
-                      className="mt-1 w-4 h-4 accent-[#1E5079]"
-                    />
-                    <span className="text-sm sm:text-base text-[#0F2A42]">
-                      {opt}
+            {/* Input by Question Type */}
+            {currentQuestion.type === "multiple_choice" ? (
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between text-xs text-[#0B7490] font-mono-tech">
+                  <span>☑️ ข้อนี้สามารถเลือกคำตอบที่ถูกต้องได้มากกว่า 1 ตัวเลือก</span>
+                  <span>
+                    เลือกแล้ว{" "}
+                    {Array.isArray(answers[currentQuestion.id])
+                      ? (answers[currentQuestion.id] as number[]).length
+                      : 0}{" "}
+                    ข้อ
+                  </span>
+                </div>
+                {currentQuestion.options?.map((opt, idx) => {
+                  const selectedList = (
+                    Array.isArray(answers[currentQuestion.id])
+                      ? answers[currentQuestion.id]
+                      : []
+                  ) as number[];
+                  const isSelected = selectedList.includes(idx);
+                  return (
+                    <label
+                      key={idx}
+                      className={`flex items-start gap-3 p-4 border cursor-pointer transition-colors ${
+                        isSelected
+                          ? "border-[#1E5079] bg-[#F2F6F9] font-medium"
+                          : "border-[#D3DEE8] bg-white hover:bg-[#F2F6F9]/50"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {
+                          const nextList = isSelected
+                            ? selectedList.filter((i) => i !== idx)
+                            : [...selectedList, idx];
+                          handleSelectOption(currentQuestion.id, nextList);
+                        }}
+                        className="mt-1 w-4 h-4 accent-[#1E5079] rounded"
+                      />
+                      <span className="text-sm sm:text-base text-[#0F2A42]">
+                        {opt}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : currentQuestion.type === "numeric_input" ? (
+              <div className="space-y-4 pt-2">
+                <p className="text-xs text-[#0B7490] font-mono-tech">
+                  ✍️ คำนวณผลลัพธ์แล้วพิมพ์คำตอบเป็นตัวเลขลงในช่องด้านล่าง
+                </p>
+                <div className="flex items-center gap-3 max-w-md">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="พิมพ์คำตอบที่คำนวณได้..."
+                    value={
+                      typeof answers[currentQuestion.id] === "string"
+                        ? (answers[currentQuestion.id] as string)
+                        : ""
+                    }
+                    onChange={(e) =>
+                      handleSelectOption(currentQuestion.id, e.target.value)
+                    }
+                    className="w-full px-4 py-3.5 border-2 border-[#1E5079] text-xl font-mono-tech text-[#0F2A42] bg-white focus:outline-none focus:ring-2 focus:ring-[#00D1FF]"
+                  />
+                  {currentQuestion.unit && (
+                    <span className="px-4 py-3.5 bg-[#F2F6F9] border border-[#D3DEE8] text-[#0F2A42] font-semibold text-sm whitespace-nowrap">
+                      {currentQuestion.unit}
                     </span>
-                  </label>
-                );
-              })}
-            </div>
+                  )}
+                </div>
+              </div>
+            ) : currentQuestion.type === "true_false" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                {[
+                  {
+                    idx: 0,
+                    label: "✓ จริง / ถูกต้อง (True)",
+                    hoverColor: "hover:border-[#188038] hover:bg-[#e6f4ea]/40",
+                  },
+                  {
+                    idx: 1,
+                    label: "✕ ไม่จริง / ผิด (False)",
+                    hoverColor: "hover:border-[#B31B1B] hover:bg-[#fdf2f2]/40",
+                  },
+                ].map((item) => {
+                  const isSelected = answers[currentQuestion.id] === item.idx;
+                  return (
+                    <button
+                      key={item.idx}
+                      type="button"
+                      onClick={() =>
+                        handleSelectOption(currentQuestion.id, item.idx)
+                      }
+                      className={`p-6 border-2 text-center text-base sm:text-lg font-semibold transition-all cursor-pointer ${
+                        isSelected
+                          ? "border-[#1E5079] bg-[#1E5079] text-white shadow-sm"
+                          : `border-[#D3DEE8] bg-white text-[#0F2A42] ${item.hoverColor}`
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="space-y-3 pt-2">
+                {currentQuestion.options?.map((opt, idx) => {
+                  const isSelected = answers[currentQuestion.id] === idx;
+                  return (
+                    <label
+                      key={idx}
+                      className={`flex items-start gap-3 p-4 border cursor-pointer transition-colors ${
+                        isSelected
+                          ? "border-[#1E5079] bg-[#F2F6F9] font-medium"
+                          : "border-[#D3DEE8] bg-white hover:bg-[#F2F6F9]/50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`q-${currentQuestion.id}`}
+                        checked={isSelected}
+                        onChange={() =>
+                          handleSelectOption(currentQuestion.id, idx)
+                        }
+                        className="mt-1 w-4 h-4 accent-[#1E5079]"
+                      />
+                      <span className="text-sm sm:text-base text-[#0F2A42]">
+                        {opt}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Hint Drawer */}
+            <HintBox hint={currentQuestion.hint} />
           </fieldset>
 
           <div className="pt-6 hairline-t flex flex-wrap items-center justify-between gap-4">
@@ -539,7 +944,7 @@ export function MockExamClient({
 
             <button
               type="button"
-              disabled={answers[currentQuestion.id] === undefined}
+              disabled={!isQuestionAnswered(currentQuestion, answers[currentQuestion.id])}
               onClick={handleNextOrFinish}
               className="px-6 py-3 bg-[#1E5079] hover:bg-[#143E61] disabled:opacity-40 text-white text-sm font-semibold transition-colors"
             >
@@ -969,25 +1374,65 @@ export function MockExamClient({
             <div className="divide-y divide-[#D3DEE8] border-t border-b border-[#D3DEE8]">
               {activeTrack.questions.map((q, idx) => {
                 const userAns = answers[q.id];
-                const isCorrect = userAns === q.correctIndex;
+                const isCorrect = isAnswerCorrect(q, userAns);
+                const userFormatted = formatUserAnswer(q, userAns);
+                const correctFormatted = formatCorrectAnswer(q);
                 return (
-                  <div key={q.id} className="py-4 space-y-1 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-[#0F2A42]">
-                        ข้อ {idx + 1}. {q.prompt}
-                      </span>
+                  <div key={q.id} className="py-5 space-y-2 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-[#0F2A42]">
+                          ข้อ {idx + 1}. {q.prompt}
+                        </span>
+                        {q.topic && (
+                          <span className="text-xs px-2 py-0.5 bg-[#F2F6F9] text-[#1E5079] font-mono-tech border border-[#D3DEE8]">
+                            {q.topic}
+                          </span>
+                        )}
+                        <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 font-mono-tech">
+                          {q.type === "multiple_choice"
+                            ? "เลือกตอบหลายข้อ"
+                            : q.type === "numeric_input"
+                            ? "อัตนัยเติมคำตอบ"
+                            : q.type === "true_false"
+                            ? "วิเคราะห์ถูก/ผิด"
+                            : "ปรนัย"}
+                        </span>
+                      </div>
                       <span
-                        className={`font-mono-tech text-sm px-2 py-0.5 shrink-0 ${
+                        className={`font-mono-tech text-xs px-2.5 py-1 font-semibold shrink-0 ${
                           isCorrect
                             ? "bg-[#e6f4ea] text-[#188038]"
                             : "bg-[#fdf2f2] text-[#B31B1B]"
                         }`}
                       >
-                        {isCorrect ? "ถูกต้อง" : "ควรทบทวน"}
+                        {isCorrect ? "✓ ถูกต้อง" : "✕ ควรทบทวน"}
                       </span>
                     </div>
-                    <p className="text-xs text-[#5A6F83]">
-                      คำตอบที่ถูกต้อง: <strong>{q.options[q.correctIndex]}</strong> —{" "}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-[#F7F9FB] p-3 border border-[#D3DEE8]">
+                      <div>
+                        <span className="text-[#5A6F83]">คำตอบของคุณ: </span>
+                        <strong
+                          className={
+                            isCorrect ? "text-[#188038]" : "text-[#B31B1B]"
+                          }
+                        >
+                          {userFormatted}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-[#5A6F83]">คำตอบที่ถูกต้อง: </span>
+                        <strong className="text-[#0F2A42]">
+                          {correctFormatted}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-[#2B4660] leading-relaxed pt-1">
+                      <span className="font-semibold text-[#1E5079]">
+                        แนวคิดเฉลย:
+                      </span>{" "}
                       {q.explanation}
                     </p>
                   </div>

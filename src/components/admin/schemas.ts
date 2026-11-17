@@ -64,6 +64,27 @@ const DIMENSIONS = (
   Object.keys(SKILL_DIMENSION_LABELS) as SkillDimensionKey[]
 ).map((k) => ({ value: k, label: SKILL_DIMENSION_LABELS[k] }));
 
+const QUESTION_TYPES = [
+  { value: "single_choice", label: "ปรนัย 4 ตัวเลือก (Single Choice)" },
+  { value: "multiple_choice", label: "ปรนัยเลือกได้หลายข้อ (Multi-select)" },
+  { value: "numeric_input", label: "อัตนัยเติมคำตอบตัวเลข (Numeric/Short Answer)" },
+  { value: "true_false", label: "วิเคราะห์ถูก/ผิด (True / False)" },
+];
+
+const QUESTION_DIFFICULTIES = [
+  { value: "foundation", label: "ระดับพื้นฐาน (Foundation)" },
+  { value: "intermediate", label: "ระดับปานกลาง (Intermediate)" },
+  { value: "challenge", label: "โจทย์ประยุกต์ท้าทาย (Challenge / Olympiad)" },
+];
+
+const DIAGRAM_TYPES = [
+  { value: "none", label: "ไม่มีไดอะแกรม (None)" },
+  { value: "bar_model", label: "Bar Model (แท่งสัดส่วน/เศษส่วน)" },
+  { value: "geometry_triangle", label: "รูปเรขาคณิตสามเหลี่ยมมุมฉาก" },
+  { value: "science_beaker", label: "กระบอกตวง / บีกเกอร์วัดปริมาตร" },
+  { value: "circuit", label: "ผังวงจรไฟฟ้า (Circuit)" },
+];
+
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 export const SCHEMAS: Record<string, CollectionSchema> = {
@@ -279,27 +300,43 @@ export const SCHEMAS: Record<string, CollectionSchema> = {
         key: "questions",
         label: "ข้อสอบ",
         type: "list",
-        itemLabel: (it, i) => `ข้อ ${i + 1}: ${str(it.prompt).slice(0, 48)}`,
+        itemLabel: (it, i) => `ข้อ ${i + 1}: [${str(it.type) || "single_choice"}] ${str(it.prompt).slice(0, 40)}`,
         newItem: () => ({
           id: `q-${uid()}`,
+          type: "single_choice",
+          difficulty: "intermediate",
+          topic: "",
           dimension: "conceptual",
+          diagramType: "none",
+          contextPassage: "",
           prompt: "",
+          hint: "",
           options: ["", "", "", ""],
           correctIndex: 0,
+          correctAnswer: "",
+          unit: "",
           explanation: "",
         }),
         fields: [
+          { key: "type", label: "รูปแบบข้อสอบ", type: "select", options: QUESTION_TYPES },
+          { key: "difficulty", label: "ระดับความยาก", type: "select", options: QUESTION_DIFFICULTIES },
+          { key: "topic", label: "หัวข้อย่อย / สาระการเรียนรู้", type: "text", placeholder: "เช่น เศษส่วน, แรงและการเคลื่อนที่, Reading" },
           { key: "dimension", label: "มิติทักษะที่วัด", type: "select", options: DIMENSIONS },
-          { key: "prompt", label: "โจทย์", type: "textarea" },
-          { key: "options", label: "ตัวเลือก (1 บรรทัด = 1 ตัวเลือก)", type: "lines" },
+          { key: "diagramType", label: "ไดอะแกรมภาพประกอบ", type: "select", options: DIAGRAM_TYPES },
+          { key: "contextPassage", label: "บทความ/สถานการณ์ประกอบโจทย์ (ถ้ามี)", type: "textarea", hint: "เช่น บทความให้อ่าน หรือตารางผลการทดลอง" },
+          { key: "prompt", label: "คำถาม/โจทย์", type: "textarea" },
+          { key: "hint", label: "คำใบ้แนวคิด (Hint)", type: "text", placeholder: "คำใบ้กระตุ้นวิธีคิดสำหรับผู้เรียน" },
+          { key: "options", label: "ตัวเลือก (1 บรรทัด = 1 ตัวเลือก สำหรับปรนัย/เลือกตอบ)", type: "lines" },
           {
             key: "correctIndex",
-            label: "ตัวเลือกที่ถูก (นับจาก 1)",
+            label: "ตัวเลือกที่ถูก (สำหรับปรนัย นับจาก 1)",
             type: "number",
             offset: 1,
-            hint: "เช่น ถ้าข้อที่ 2 ถูก ให้ใส่ 2",
+            hint: "เช่น ถ้าตัวเลือกที่ 2 ถูก ให้ใส่ 2 (สำหรับ True/False: 1=จริง, 2=เท็จ)",
           },
-          { key: "explanation", label: "คำอธิบายเฉลย", type: "textarea" },
+          { key: "correctAnswer", label: "คำตอบที่ถูก (สำหรับอัตนัยเติมคำตอบตัวเลข)", type: "text", placeholder: "เช่น 360 หรือ 5" },
+          { key: "unit", label: "หน่วยคำตอบ (สำหรับอัตนัย)", type: "text", placeholder: "เช่น ซม., บาท, m/s²" },
+          { key: "explanation", label: "คำอธิบายเฉลยและวิธีคิด", type: "textarea" },
         ],
       },
     ],

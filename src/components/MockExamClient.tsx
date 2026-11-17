@@ -357,17 +357,22 @@ export function MockExamClient({
 
       // 1. Check direct Google OAuth session first (somkidplus project)
       try {
-        const meRes = await fetch("/api/auth/me");
+        const meRes = await fetch("/api/auth/me", {
+          credentials: "include",
+          cache: "no-store",
+        });
         if (meRes.ok) {
           const meData = await meRes.json();
-          if (active && meData.authenticated && meData.user) {
+          const user = meData.user;
+          if (active && user && user.email) {
             setAuthUser({
               fullName:
-                meData.user.name ||
-                meData.user.email?.split("@")[0] ||
+                user.fullName ||
+                user.name ||
+                user.email.split("@")[0] ||
                 "ผู้ปกครอง Somkid+",
-              email: meData.user.email || "",
-              avatarUrl: meData.user.picture || undefined,
+              email: user.email,
+              avatarUrl: user.avatarUrl || user.picture || undefined,
               isDemo: false,
             });
 
@@ -679,16 +684,6 @@ export function MockExamClient({
 
     // Direct Google OAuth route using somkidplus credentials (no SV-Portal branding)
     window.location.href = `/api/auth/google?next=/mock-exam`;
-  }
-
-  function handleDemoContinue() {
-    // Demo fallback for instant preview without live OAuth redirect
-    setAuthUser({
-      fullName: "ผู้ปกครอง (บัญชีทดสอบ สมคิดวิทยา)",
-      email: "parent.demo@somkidvittaya.ac.th",
-      isDemo: true,
-    });
-    setStep("results");
   }
 
   async function handleEnrichmentSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -1215,13 +1210,6 @@ export function MockExamClient({
                   />
                 </svg>
                 <span>ดำเนินการต่อด้วย Google (Gmail) เพื่อดูผลวิเคราะห์</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleDemoContinue}
-                className="w-full text-center text-xs text-[#5A6F83] hover:text-[#1E5079] font-medium pt-2 transition-colors cursor-pointer"
-              >
-                หรือดูผลวิเคราะห์ทันทีโดยไม่ต้องล็อกอิน (โหมดทดสอบ) →
               </button>
             </div>
           )}

@@ -3,6 +3,7 @@ import {
   createGoogleUserSession,
   exchangeGoogleCode,
   getGoogleRedirectUri,
+  serializeUserSession,
 } from "@/lib/google-auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -56,7 +57,16 @@ export async function GET(request: Request) {
     const googleUser = await exchangeGoogleCode(code, redirectUri);
     if (googleUser) {
       await createGoogleUserSession(googleUser);
-      return NextResponse.redirect(`${origin}${next}`);
+      const res = NextResponse.redirect(`${origin}${next}`);
+      // Explicitly attach cookie header to ensure it persists through the 307 redirect
+      res.cookies.set("sk_oauth_user", serializeUserSession(googleUser), {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7,
+      });
+      return res;
     }
 
     // 2. Fallback to Supabase exchange if initiated through Supabase GoTrue

@@ -9,8 +9,8 @@ export interface GoogleUserSession {
   isDemo: boolean;
 }
 
-const COOKIE_NAME = "sk_oauth_user";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+export const COOKIE_NAME = "sk_oauth_user";
+export const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
@@ -24,6 +24,13 @@ function secret(): string {
 
 function sign(payload: string): string {
   return createHmac("sha256", secret()).update(payload).digest("hex");
+}
+
+export function serializeUserSession(user: GoogleUserSession): string {
+  const json = JSON.stringify(user);
+  const b64 = Buffer.from(json).toString("base64url");
+  const sig = sign(b64);
+  return `${b64}.${sig}`;
 }
 
 export function getGoogleRedirectUri(origin: string): string {
@@ -41,20 +48,23 @@ export function getGoogleRedirectUri(origin: string): string {
 
 export async function createGoogleUserSession(
   user: GoogleUserSession
-): Promise<void> {
-  const json = JSON.stringify(user);
-  const b64 = Buffer.from(json).toString("base64url");
-  const sig = sign(b64);
-  const cookieValue = `${b64}.${sig}`;
+): Promise<string> {
+  const cookieValue = serializeUserSession(user);
 
-  const store = await cookies();
-  store.set(COOKIE_NAME, cookieValue, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: COOKIE_MAX_AGE,
-  });
+  try {
+    const store = await cookies();
+    store.set(COOKIE_NAME, cookieValue, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: COOKIE_MAX_AGE,
+    });
+  } catch {
+    // ignore
+  }
+
+  return cookieValue;
 }
 
 export async function getGoogleUserSession(): Promise<GoogleUserSession | null> {

@@ -253,7 +253,17 @@
       "comboDiscountNote": "ส่วนลด 1,000 บาท เมื่อจับคู่คอร์ส Math Olympiad หรือ Science Lab"
     }
   ],
-  "instructors": [],
+  "instructors": [
+    {
+      "id": "inst-7f96fc5d",
+      "published": true,
+      "name": "ครูพี่ใบตอง",
+      "role": "ติวเตอร์รายวิชาคณิตศาสตร์",
+      "credentials": "ภาควิชาคณิตศาสตร์และวิทยาการคอมพิวเตอร์ คณะวิทยาศาสตร์ จุฬาลงกรณ์มหาวิทยาลัย",
+      "focus": "วิเคราะห์นักเรียนรายบุคคล พร้อมสร้างความเข้าใจ\nและสร้างบรรยากาศห้องเรียนที่สนุกสนาน",
+      "experienceYears": 5
+    }
+  ],
   "testimonials": [],
   "examTracks": [
     {

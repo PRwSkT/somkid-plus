@@ -15,6 +15,7 @@ import {
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { SkillRadarChart } from "@/components/SkillRadarChart";
 import { EnrollmentDialog } from "@/components/EnrollmentDialog";
+import { MathText } from "@/components/MathText";
 
 const SESSION_KEY = "somkid_mock_exam_v1";
 
@@ -141,20 +142,20 @@ function QuestionDiagram({ type }: { type?: DiagramType }) {
     return (
       <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-4 rounded-sm my-3">
         <p className="text-xs font-mono-tech text-[#1E5079] mb-2 font-semibold">
-          📊 Bar Model (แบบจำลองแท่งสัดส่วนเศษส่วน):
+          Bar Model (แบบจำลองแท่งสัดส่วนเศษส่วน):
         </p>
-        <svg viewBox="0 0 500 120" className="w-full max-w-lg h-auto mx-auto select-none" fill="none">
-          <rect x="20" y="25" width="460" height="48" rx="4" fill="#FFFFFF" stroke="#0F2A42" strokeWidth="2" />
-          <rect x="20" y="25" width="276" height="48" fill="#00D1FF" fillOpacity="0.25" stroke="#00C7FF" strokeWidth="2" />
+        <svg viewBox="0 0 500 135" className="w-full max-w-lg h-auto mx-auto select-none" fill="none">
+          <rect x="20" y="32" width="460" height="48" rx="4" fill="#FFFFFF" stroke="#0F2A42" strokeWidth="2" />
+          <rect x="20" y="32" width="276" height="48" fill="#00D1FF" fillOpacity="0.25" stroke="#00C7FF" strokeWidth="2" />
           {[1, 2, 3, 4].map((i) => (
-            <line key={i} x1={20 + i * 92} y1="25" x2={20 + i * 92} y2="73" stroke="#0F2A42" strokeWidth="1.5" strokeDasharray="3 3" />
+            <line key={i} x1={20 + i * 92} y1="32" x2={20 + i * 92} y2="80" stroke="#0F2A42" strokeWidth="1.5" strokeDasharray="3 3" />
           ))}
-          <path d="M 22 18 Q 158 5 294 18" fill="none" stroke="#0094B8" strokeWidth="1.5" />
-          <text x="158" y="14" fill="#007A99" fontSize="11" fontWeight="bold" textAnchor="middle">มีน้ำอยู่ 3/5 ของถัง</text>
-          <path d="M 298 80 Q 390 92 478 80" fill="none" stroke="#D9381E" strokeWidth="1.5" />
-          <text x="388" y="106" fill="#B31B1B" fontSize="11" fontWeight="bold" textAnchor="middle">เติมเพิ่มอีก 24 ลิตร (2/5)</text>
+          <path d="M 22 26 Q 158 15 294 26" fill="none" stroke="#0094B8" strokeWidth="1.5" />
+          <text x="158" y="13" fill="#007A99" fontSize="12" fontWeight="bold" textAnchor="middle">มีน้ำอยู่ 3/5 ของถัง</text>
+          <path d="M 298 87 Q 390 98 478 87" fill="none" stroke="#D9381E" strokeWidth="1.5" />
+          <text x="388" y="115" fill="#B31B1B" fontSize="12" fontWeight="bold" textAnchor="middle">เติมเพิ่มอีก 24 ลิตร (2/5)</text>
           {[0, 1, 2, 3, 4].map((i) => (
-            <text key={i} x={20 + i * 92 + 46} y="54" fill="#0F2A42" fontSize="12" fontWeight="600" textAnchor="middle">1/5</text>
+            <text key={i} x={20 + i * 92 + 46} y="61" fill="#0F2A42" fontSize="12" fontWeight="600" textAnchor="middle">1/5</text>
           ))}
         </svg>
       </div>
@@ -165,7 +166,7 @@ function QuestionDiagram({ type }: { type?: DiagramType }) {
     return (
       <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-4 rounded-sm my-3">
         <p className="text-xs font-mono-tech text-[#1E5079] mb-2 font-semibold">
-          📐 แผนภาพเรขาคณิตสามเหลี่ยมมุมฉาก:
+          แผนภาพเรขาคณิตสามเหลี่ยมมุมฉาก:
         </p>
         <svg viewBox="0 0 360 160" className="w-full max-w-md h-auto mx-auto select-none" fill="none">
           <polygon points="50,130 290,130 50,30" fill="#E0F8FF" fillOpacity="0.5" stroke="#1E5079" strokeWidth="2.5" />
@@ -184,7 +185,7 @@ function QuestionDiagram({ type }: { type?: DiagramType }) {
     return (
       <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-4 rounded-sm my-3">
         <p className="text-xs font-mono-tech text-[#1E5079] mb-2 font-semibold">
-          🧪 กระบอกตวงวัดปริมาตรของเหลว (Graduated Cylinder):
+          กระบอกตวงวัดปริมาตรของเหลว (Graduated Cylinder):
         </p>
         <svg viewBox="0 0 260 180" className="w-full max-w-xs h-auto mx-auto select-none" fill="none">
           <rect x="100" y="20" width="60" height="140" rx="3" fill="#FFFFFF" stroke="#0F2A42" strokeWidth="2" />
@@ -211,7 +212,7 @@ function QuestionDiagram({ type }: { type?: DiagramType }) {
     return (
       <div className="bg-[#F7F9FB] border border-[#D3DEE8] p-4 rounded-sm my-3">
         <p className="text-xs font-mono-tech text-[#1E5079] mb-2 font-semibold">
-          ⚡ แผนผังวงจรไฟฟ้าอย่างง่าย (Electrical Circuit):
+          แผนผังวงจรไฟฟ้าอย่างง่าย (Electrical Circuit):
         </p>
         <svg viewBox="0 0 340 140" className="w-full max-w-sm h-auto mx-auto select-none" fill="none">
           <rect x="40" y="25" width="260" height="90" fill="none" stroke="#0F2A42" strokeWidth="2" />
@@ -240,10 +241,10 @@ function PassageCard({ text }: { text?: string }) {
   if (!text) return null;
   return (
     <div className="bg-[#F8FAFC] border-l-4 border-[#1E5079] p-4 text-[#2B4660] text-sm leading-relaxed my-3 space-y-1">
-      <div className="flex items-center gap-1.5 text-xs font-mono-tech text-[#1E5079] font-bold uppercase tracking-wider">
-        <span>📖 บริบท / สถานการณ์ประกอบโจทย์ (Passage Context)</span>
+      <div className="text-xs font-mono-tech text-[#1E5079] font-bold uppercase tracking-wider">
+        <span>บริบท / สถานการณ์ประกอบโจทย์ (Passage Context)</span>
       </div>
-      <p className="whitespace-pre-line text-sm text-[#0F2A42] font-serif">{text}</p>
+      <MathText text={text} as="p" className="whitespace-pre-line text-sm text-[#0F2A42] font-serif" />
     </div>
   );
 }
@@ -258,12 +259,12 @@ function HintBox({ hint }: { hint?: string }) {
         onClick={() => setOpen((v) => !v)}
         className="inline-flex items-center gap-1.5 text-xs text-[#0B7490] hover:text-[#085468] font-medium transition-colors cursor-pointer"
       >
-        <span>{open ? "▲ ซ่อนคำใบ้แนวคิด" : "💡 ต้องการคำใบ้แนวคิด? (คลิกเพื่อดู)"}</span>
+        <span>{open ? "▲ ซ่อนคำใบ้แนวคิด" : "คำใบ้แนวคิด (คลิกเพื่อแสดง)"}</span>
       </button>
       {open && (
         <div className="mt-2 p-3 bg-[#E0F8FF]/50 border border-[#00D1FF]/40 rounded-sm text-xs text-[#0F2A42] leading-relaxed">
           <strong className="text-[#0B7490]">แนวคิดเบื้องต้น: </strong>
-          {hint}
+          <MathText text={hint} />
         </div>
       )}
     </div>
@@ -330,6 +331,32 @@ export function MockExamClient({
           setElapsedSeconds(restored.elapsedSeconds);
       }
 
+      // 1. Check direct Google OAuth session first (somkidplus project)
+      try {
+        const meRes = await fetch("/api/auth/me");
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (active && meData.authenticated && meData.user) {
+            setAuthUser({
+              fullName:
+                meData.user.name ||
+                meData.user.email?.split("@")[0] ||
+                "ผู้ปกครอง Somkid+",
+              email: meData.user.email || "",
+              avatarUrl: meData.user.picture || undefined,
+              isDemo: false,
+            });
+            if (restored?.completedAt) {
+              setStep("enrichment");
+            }
+            return;
+          }
+        }
+      } catch {
+        // ignore network error
+      }
+
+      // 2. Check Supabase auth session as fallback
       const supabase = createClient();
       if (supabase) {
         const { data } = await supabase.auth.getUser();
@@ -366,9 +393,14 @@ export function MockExamClient({
   }, []);
 
   async function handleSignOut() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // ignore
+    }
     const supabase = createClient();
     if (supabase) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut().catch(() => {});
     }
     setAuthUser(null);
     setStep("oauth_gate");
@@ -508,25 +540,15 @@ export function MockExamClient({
     setOauthError(null);
     persistState(answers, currentIndex, elapsedSeconds, new Date().toISOString());
 
-    const supabase = createClient();
-    if (supabase) {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/mock-exam`,
-          scopes: "openid email profile",
-        },
-      });
-      if (error) {
-        setOauthError(error.message);
-      }
-      return;
-    }
+    // Direct Google OAuth route using somkidplus credentials (no SV-Portal branding)
+    window.location.href = `/api/auth/google?next=/mock-exam`;
+  }
 
-    // Demo fallback when Supabase env vars are not yet configured
+  function handleDemoContinue() {
+    // Demo fallback for instant preview without live OAuth redirect
     setAuthUser({
-      fullName: "ผู้ปกครอง (Demo Gmail Account)",
-      email: "parent.demo@gmail.com",
+      fullName: "ผู้ปกครอง (บัญชีทดสอบ สมคิดวิทยา)",
+      email: "parent.demo@somkidvittaya.ac.th",
       isDemo: true,
     });
     setStep("enrichment");
@@ -734,7 +756,7 @@ export function MockExamClient({
             <div className="flex flex-wrap items-center gap-2 pb-1">
               {currentQuestion.topic && (
                 <span className="px-2.5 py-1 bg-[#F2F6F9] border border-[#D3DEE8] text-xs font-medium text-[#1E5079]">
-                  🏷️ {currentQuestion.topic}
+                  <span className="font-semibold">หัวข้อ:</span> {currentQuestion.topic}
                 </span>
               )}
               {currentQuestion.difficulty && (
@@ -783,14 +805,15 @@ export function MockExamClient({
             )}
 
             <legend className="font-editorial text-xl sm:text-2xl text-[#0F2A42] leading-relaxed">
-              {currentIndex + 1}. {currentQuestion.prompt}
+              <span className="font-mono-tech mr-1">{currentIndex + 1}.</span>{" "}
+              <MathText text={currentQuestion.prompt} as="span" />
             </legend>
 
             {/* Input by Question Type */}
             {currentQuestion.type === "multiple_choice" ? (
               <div className="space-y-3 pt-2">
                 <div className="flex items-center justify-between text-xs text-[#0B7490] font-mono-tech">
-                  <span>☑️ ข้อนี้สามารถเลือกคำตอบที่ถูกต้องได้มากกว่า 1 ตัวเลือก</span>
+                  <span>(เลือกได้มากกว่า 1 คำตอบ) ข้อนี้สามารถเลือกตัวเลือกที่ถูกต้องได้หลายข้อ</span>
                   <span>
                     เลือกแล้ว{" "}
                     {Array.isArray(answers[currentQuestion.id])
@@ -826,9 +849,11 @@ export function MockExamClient({
                         }}
                         className="mt-1 w-4 h-4 accent-[#1E5079] rounded"
                       />
-                      <span className="text-sm sm:text-base text-[#0F2A42]">
-                        {opt}
-                      </span>
+                      <MathText
+                        text={opt}
+                        as="span"
+                        className="text-sm sm:text-base text-[#0F2A42]"
+                      />
                     </label>
                   );
                 })}
@@ -836,7 +861,7 @@ export function MockExamClient({
             ) : currentQuestion.type === "numeric_input" ? (
               <div className="space-y-4 pt-2">
                 <p className="text-xs text-[#0B7490] font-mono-tech">
-                  ✍️ คำนวณผลลัพธ์แล้วพิมพ์คำตอบเป็นตัวเลขลงในช่องด้านล่าง
+                  คำนวณผลลัพธ์แล้วพิมพ์คำตอบเป็นตัวเลขลงในช่องด้านล่าง
                 </p>
                 <div className="flex items-center gap-3 max-w-md">
                   <input
@@ -865,12 +890,12 @@ export function MockExamClient({
                 {[
                   {
                     idx: 0,
-                    label: "✓ จริง / ถูกต้อง (True)",
+                    label: "จริง (True)",
                     hoverColor: "hover:border-[#188038] hover:bg-[#e6f4ea]/40",
                   },
                   {
                     idx: 1,
-                    label: "✕ ไม่จริง / ผิด (False)",
+                    label: "เท็จ (False)",
                     hoverColor: "hover:border-[#B31B1B] hover:bg-[#fdf2f2]/40",
                   },
                 ].map((item) => {
@@ -915,9 +940,11 @@ export function MockExamClient({
                         }
                         className="mt-1 w-4 h-4 accent-[#1E5079]"
                       />
-                      <span className="text-sm sm:text-base text-[#0F2A42]">
-                        {opt}
-                      </span>
+                      <MathText
+                        text={opt}
+                        as="span"
+                        className="text-sm sm:text-base text-[#0F2A42]"
+                      />
                     </label>
                   );
                 })}
@@ -1287,7 +1314,7 @@ export function MockExamClient({
                   onClick={() => window.print()}
                   className="inline-flex items-center gap-2 px-4 py-2 border border-[#D3DEE8] text-[#5A6F83] text-xs font-medium hover:bg-[#F2F6F9] transition-colors"
                 >
-                  <span>🖨️ พิมพ์ผลวิเคราะห์</span>
+                  <span>พิมพ์ผลวิเคราะห์</span>
                 </button>
               </div>
             </div>
@@ -1382,7 +1409,7 @@ export function MockExamClient({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-semibold text-[#0F2A42]">
-                          ข้อ {idx + 1}. {q.prompt}
+                          ข้อ {idx + 1}. <MathText text={q.prompt} as="span" />
                         </span>
                         {q.topic && (
                           <span className="text-xs px-2 py-0.5 bg-[#F2F6F9] text-[#1E5079] font-mono-tech border border-[#D3DEE8]">
@@ -1406,26 +1433,28 @@ export function MockExamClient({
                             : "bg-[#fdf2f2] text-[#B31B1B]"
                         }`}
                       >
-                        {isCorrect ? "✓ ถูกต้อง" : "✕ ควรทบทวน"}
+                        {isCorrect ? "ถูกต้อง" : "ควรทบทวน"}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-[#F7F9FB] p-3 border border-[#D3DEE8]">
                       <div>
                         <span className="text-[#5A6F83]">คำตอบของคุณ: </span>
-                        <strong
+                        <MathText
+                          text={userFormatted}
+                          as="strong"
                           className={
                             isCorrect ? "text-[#188038]" : "text-[#B31B1B]"
                           }
-                        >
-                          {userFormatted}
-                        </strong>
+                        />
                       </div>
                       <div>
                         <span className="text-[#5A6F83]">คำตอบที่ถูกต้อง: </span>
-                        <strong className="text-[#0F2A42]">
-                          {correctFormatted}
-                        </strong>
+                        <MathText
+                          text={correctFormatted}
+                          as="strong"
+                          className="text-[#0F2A42]"
+                        />
                       </div>
                     </div>
 
@@ -1433,7 +1462,7 @@ export function MockExamClient({
                       <span className="font-semibold text-[#1E5079]">
                         แนวคิดเฉลย:
                       </span>{" "}
-                      {q.explanation}
+                      <MathText text={q.explanation} as="span" />
                     </p>
                   </div>
                 );

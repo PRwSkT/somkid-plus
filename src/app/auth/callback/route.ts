@@ -1,10 +1,32 @@
 import { NextResponse } from "next/server";
+import {
+  createGoogleUserSession,
+  exchangeGoogleCode,
+  getGoogleRedirectUri,
+} from "@/lib/google-auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const rawNext = requestUrl.searchParams.get("next") ?? "/mock-exam";
+  const stateRaw = requestUrl.searchParams.get("state");
+  const paramRedirectUri = requestUrl.searchParams.get("redirect_uri");
+
+  let parsedNext = "/mock-exam";
+  let stateRedirectUri: string | null = null;
+  if (stateRaw) {
+    try {
+      const decoded = JSON.parse(
+        Buffer.from(stateRaw, "base64url").toString("utf-8")
+      );
+      if (decoded.next) parsedNext = decoded.next;
+      if (decoded.redirectUri) stateRedirectUri = decoded.redirectUri;
+    } catch {
+      // ignore
+    }
+  }
+
+  const rawNext = requestUrl.searchParams.get("next") ?? parsedNext;
   // Mitigate Open Redirect: Only allow relative paths starting with single '/'
   const next =
     rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("\\")
@@ -28,16 +50,29 @@ export async function GET(request: Request) {
   }
 
   if (code) {
+    // 1. Try Direct Google OAuth exchange first using the Somkid+ credentials
+    const redirectUri =
+      paramRedirectUri || stateRedirectUri || getGoogleRedirectUri(origin);
+    const googleUser = await exchangeGoogleCode(code, redirectUri);
+    if (googleUser) {
+      await createGoogleUserSession(googleUser);
+      return NextResponse.redirect(`${origin}${next}`);
+    }
+
+    // 2. Fallback to Supabase exchange if initiated through Supabase GoTrue
     const supabase = await createServerSupabaseClient();
     if (supabase) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (!error) {
         return NextResponse.redirect(`${origin}${next}`);
       }
-      return NextResponse.redirect(
-        `${origin}${next}?oauth_error=${encodeURIComponent(error.message)}`
-      );
     }
+
+    return NextResponse.redirect(
+      `${origin}${next}?oauth_error=${encodeURIComponent(
+        "ไม่สามารถยืนยันตัวตนผ่าน Google ได้ กรุณาลองใหม่อีกครั้ง"
+      )}`
+    );
   }
 
   return NextResponse.redirect(`${origin}${next}`);

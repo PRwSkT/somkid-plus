@@ -2,7 +2,11 @@ import { isAdmin } from "@/lib/admin-auth";
 import { readSubmissions } from "@/lib/content-store";
 
 function esc(v: unknown): string {
-  const s = v === undefined || v === null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+  let s = v === undefined || v === null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+  // Mitigate CSV Formula Injection (CWE-1236): prefix dangerous formula characters with single quote
+  if (/^[=+\-@\t\r]/.test(s)) {
+    s = `'${s}`;
+  }
   return `"${s.replace(/"/g, '""')}"`;
 }
 

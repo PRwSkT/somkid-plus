@@ -4,7 +4,12 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const next = requestUrl.searchParams.get("next") ?? "/mock-exam";
+  const rawNext = requestUrl.searchParams.get("next") ?? "/mock-exam";
+  // Mitigate Open Redirect: Only allow relative paths starting with single '/'
+  const next =
+    rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("\\")
+      ? rawNext
+      : "/mock-exam";
   const errorMsg =
     requestUrl.searchParams.get("error_description") ||
     requestUrl.searchParams.get("error");

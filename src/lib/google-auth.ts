@@ -16,10 +16,12 @@ export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 
 function secret(): string {
-  return (
-    process.env.ADMIN_SESSION_SECRET ||
-    "somkid-google-oauth-session-secret-key-32ch"
-  );
+  const base = process.env.USER_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET;
+  if (!base) {
+    throw new Error("USER_SESSION_SECRET or ADMIN_SESSION_SECRET is not configured");
+  }
+  // Domain-separate from the admin session HMAC even when the base secret is shared
+  return createHmac("sha256", base).update("somkid-user-session-v1").digest("hex");
 }
 
 function sign(payload: string): string {

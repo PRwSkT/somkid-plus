@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
+import SubmissionStatus from "@/components/admin/SubmissionStatus";
 import { readSubmissions, type Submission } from "@/lib/content-store";
 
 export const instant = false;
@@ -62,6 +63,7 @@ async function SubmissionsContent() {
                 <th className="px-4 py-3 font-semibold">ชื่อ</th>
                 <th className="px-4 py-3 font-semibold">ติดต่อ</th>
                 <th className="px-4 py-3 font-semibold">รายละเอียด</th>
+                <th className="px-4 py-3 font-semibold">สถานะ</th>
               </tr>
             </thead>
             <tbody>
@@ -88,6 +90,13 @@ async function SubmissionsContent() {
                       {pick(d, "email") && <div className="text-sm text-[#5A6F83]">{pick(d, "email")}</div>}
                     </td>
                     <td className="px-4 py-3 text-[#2B4660]">{detail}</td>
+                    <td className="px-4 py-3">
+                      <SubmissionStatus
+                        id={s.id}
+                        status={s.status ?? "new"}
+                        note={s.adminNote ?? ""}
+                      />
+                    </td>
                   </tr>
                 );
               })}

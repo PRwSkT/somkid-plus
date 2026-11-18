@@ -13,7 +13,25 @@ const sukhumvit = localFont({
   display: "swap",
 });
 
+const SITE_URL = "https://somkidplus.somkidvittaya.ac.th";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  openGraph: {
+    type: "website",
+    locale: "th_TH",
+    siteName: "Somkid+",
+    url: SITE_URL,
+    title: "Somkid+ | สถาบันพัฒนาศักยภาพวิชาการและทักษะรอบด้าน",
+    description:
+      "หลักสูตรคณิตศาสตร์ วิทยาศาสตร์ ภาษาอังกฤษ MEP และระบบสอบจำลองวัดระดับ โดยเครือสมคิดวิทยา จ.ระยอง",
+    images: [{ url: "/icon-512.png", width: 512, height: 512, alt: "Somkid+" }],
+  },
+  twitter: {
+    card: "summary",
+    title: "Somkid+ | สถาบันพัฒนาศักยภาพวิชาการ",
+    images: ["/icon-512.png"],
+  },
   title: {
     default: "Somkid+ | สถาบันพัฒนาศักยภาพวิชาการและทักษะรอบด้าน",
     template: "%s | Somkid+",

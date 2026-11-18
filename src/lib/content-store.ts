@@ -63,7 +63,7 @@ export async function readContent(): Promise<SiteContent> {
   }
 
   const supabase = getAdminSupabaseClient();
-  let dbData: Partial<SiteContent> = {};
+  const dbData: Partial<SiteContent> = {};
 
   if (supabase) {
     try {
@@ -140,6 +140,38 @@ export interface Submission {
   type: "mock_exam_lead" | "enrollment" | "trial_class" | "campus_visit";
   createdAt: string;
   data: Record<string, unknown>;
+  status?: SubmissionStatus;
+  adminNote?: string;
+}
+
+export const SUBMISSION_STATUSES = [
+  "new",
+  "contacted",
+  "trial_booked",
+  "enrolled",
+  "closed",
+] as const;
+export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
+
+export async function updateSubmission(
+  id: string,
+  patch: { status?: SubmissionStatus; adminNote?: string }
+): Promise<boolean> {
+  const supabase = getAdminSupabaseClient();
+  if (!supabase) return false;
+  const row: Record<string, unknown> = {};
+  if (patch.status) row.status = patch.status;
+  if (patch.adminNote !== undefined) row.admin_note = patch.adminNote;
+  if (Object.keys(row).length === 0) return false;
+  const { error } = await supabase
+    .from("site_submissions")
+    .update(row)
+    .eq("id", id);
+  if (error) {
+    console.error("updateSubmission error:", error);
+    return false;
+  }
+  return true;
 }
 
 export async function readSubmissions(): Promise<Submission[]> {
@@ -148,7 +180,7 @@ export async function readSubmissions(): Promise<Submission[]> {
     try {
       const { data, error } = await supabase
         .from("site_submissions")
-        .select("id, type, data, created_at")
+        .select("id, type, data, created_at, status, admin_note")
         .order("created_at", { ascending: false });
 
       if (!error && Array.isArray(data) && data.length > 0) {
@@ -157,6 +189,8 @@ export async function readSubmissions(): Promise<Submission[]> {
           type: row.type as Submission["type"],
           createdAt: row.created_at,
           data: (row.data ?? {}) as Record<string, unknown>,
+          status: (row.status ?? "new") as SubmissionStatus,
+          adminNote: (row.admin_note ?? "") as string,
         }));
       }
     } catch (err) {
@@ -172,22 +206,28 @@ export async function readSubmissions(): Promise<Submission[]> {
   }
 }
 
+/** Returns true when the submission was durably stored. */
 export async function appendSubmission(
   type: Submission["type"],
   data: Record<string, unknown>
-): Promise<void> {
+): Promise<boolean> {
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
 
   const supabase = getAdminSupabaseClient();
   if (supabase) {
     try {
-      await supabase.from("site_submissions").insert({
+      const { error } = await supabase.from("site_submissions").insert({
         id,
         type,
         data,
         created_at: createdAt,
       });
+      if (error) {
+        console.error("Supabase appendSubmission error:", error);
+      } else {
+        return true;
+      }
     } catch (err) {
       console.error("Supabase appendSubmission error:", err);
     }
@@ -203,7 +243,9 @@ export async function appendSubmission(
     });
     await fs.mkdir(DATA_DIR, { recursive: true });
     await fs.writeFile(SUBMISSIONS_FILE, JSON.stringify(list, null, 2), "utf-8");
+    return true;
   } catch {
     // Read-only filesystem on serverless; database persistence handles it
+    return false;
   }
 }

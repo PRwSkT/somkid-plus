@@ -15,6 +15,7 @@ export async function GET(request: Request) {
 
   let parsedNext = "/mock-exam";
   let stateRedirectUri: string | null = null;
+  let stateNonce: string | null = null;
   if (stateRaw) {
     try {
       const decoded = JSON.parse(
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
       );
       if (decoded.next) parsedNext = decoded.next;
       if (decoded.redirectUri) stateRedirectUri = decoded.redirectUri;
+      if (decoded.nonce) stateNonce = String(decoded.nonce);
     } catch {
       // ignore
     }
@@ -54,10 +56,21 @@ export async function GET(request: Request) {
     // 1. Try Direct Google OAuth exchange first using the Somkid+ credentials
     const redirectUri =
       paramRedirectUri || stateRedirectUri || getGoogleRedirectUri(origin);
-    const googleUser = await exchangeGoogleCode(code, redirectUri);
+    const cookieNonce = request.headers
+      .get("cookie")
+      ?.split(";")
+      .map((c) => c.trim())
+      .find((c) => c.startsWith("sk_oauth_nonce="))
+      ?.slice("sk_oauth_nonce=".length);
+    // CSRF protection: the state nonce must match the cookie set at login start
+    const nonceOk = Boolean(stateNonce && cookieNonce && stateNonce === cookieNonce);
+    const googleUser = nonceOk
+      ? await exchangeGoogleCode(code, redirectUri)
+      : null;
     if (googleUser) {
       await createGoogleUserSession(googleUser);
       const res = NextResponse.redirect(`${origin}${next}`);
+      res.cookies.delete("sk_oauth_nonce");
       // Explicitly attach cookie header to ensure it persists through the 307 redirect
       res.cookies.set("sk_oauth_user", serializeUserSession(googleUser), {
         httpOnly: true,

@@ -16,9 +16,9 @@ export async function GET() {
   }
   const subs = await readSubmissions();
   const keys = Array.from(new Set(subs.flatMap((s) => Object.keys(s.data))));
-  const header = ["createdAt", "type", ...keys].map(esc).join(",");
+  const header = ["createdAt", "type", "status", "adminNote", ...keys].map(esc).join(",");
   const rows = subs.map((s) =>
-    [s.createdAt, s.type, ...keys.map((k) => s.data[k])].map(esc).join(",")
+    [s.createdAt, s.type, s.status ?? "new", s.adminNote ?? "", ...keys.map((k) => s.data[k])].map(esc).join(",")
   );
   // BOM so Excel opens Thai text correctly
   const body = "\uFEFF" + [header, ...rows].join("\n");

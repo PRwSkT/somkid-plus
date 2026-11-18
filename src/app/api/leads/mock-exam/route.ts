@@ -1,17 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { appendSubmission } from "@/lib/content-store";
+import { insertExamAttempt, str, validateExamPayload } from "@/lib/exam-record";
 import { getGoogleUserSession } from "@/lib/google-auth";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
-
-function expectedTier(percent: number): string {
-  if (percent < 50) return "foundation";
-  if (percent < 80) return "accelerator";
-  return "achiever";
-}
-
-function str(v: unknown, max: number): string {
-  return typeof v === "string" ? v.trim().slice(0, max) : "";
-}
+import {
+  emailEnabled,
+  sendAdminNotification,
+  sendParentResultEmail,
+} from "@/lib/result-email";
+import { getAdminSupabaseClient } from "@/lib/supabase/admin";
 
 function validPhone(v: string): boolean {
   const digits = v.replace(/\D/g, "");
@@ -65,55 +62,44 @@ export async function POST(request: Request) {
     );
   }
 
-  const total = Number(body.totalQuestions);
-  const correct = Number(body.correctCount);
-  const score = Number(body.scorePercent);
-  const tier = str(body.tier, 30);
-  if (
-    !Number.isInteger(total) ||
-    total < 1 ||
-    total > 200 ||
-    !Number.isInteger(correct) ||
-    correct < 0 ||
-    correct > total ||
-    !Number.isFinite(score) ||
-    Math.abs(score - Math.round((correct / total) * 100)) > 1 ||
-    tier !== expectedTier(Math.round((correct / total) * 100))
-  ) {
-    return NextResponse.json(
-      { error: "ข้อมูลผลสอบไม่สอดคล้องกัน กรุณาทำข้อสอบใหม่อีกครั้ง" },
-      { status: 400 }
-    );
+  const parsed = validateExamPayload(body);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  const rawSkills =
-    body.skillBreakdown && typeof body.skillBreakdown === "object"
-      ? (body.skillBreakdown as Record<string, unknown>)
-      : {};
-  const skillBreakdown: Record<string, number> = {};
-  for (const [k, v] of Object.entries(rawSkills).slice(0, 12)) {
-    const n = Number(v);
-    if (Number.isFinite(n)) skillBreakdown[k.slice(0, 30)] = Math.min(100, Math.max(0, Math.round(n)));
-  }
-
-  const recommendedCourseIds = Array.isArray(body.recommendedCourseIds)
-    ? body.recommendedCourseIds.map((x) => str(x, 80)).filter(Boolean).slice(0, 10)
-    : [];
+  const existingAttemptId = str(body.attemptId, 64);
+  const attemptId =
+    /^[0-9a-fA-F-]{36}$/.test(existingAttemptId)
+      ? existingAttemptId
+      : await insertExamAttempt(parsed.data);
 
   const record = {
     fullName: user.fullName || str(body.fullName, 120) || "ผู้ปกครอง",
     email: user.email,
     phone,
     lineId: str(body.lineId, 60),
-    trackId: str(body.trackId, 60),
-    trackLabel: str(body.trackLabel, 120),
-    scorePercent: Math.round(score),
-    correctCount: correct,
-    totalQuestions: total,
-    tier,
-    skillBreakdown,
-    recommendedCourseIds,
+    attemptId,
+    ...parsed.data,
   };
+
+  const supabase = getAdminSupabaseClient();
+  if (supabase) {
+    const { error: leadErr } = await supabase.from("leads").insert({
+      user_id: null,
+      attempt_id: attemptId,
+      full_name: record.fullName,
+      email: record.email,
+      phone: record.phone,
+      line_id: record.lineId || null,
+      pdpa_consent: true,
+      pdpa_consented_at: new Date().toISOString(),
+      recommended_tier: record.tier,
+      webhook_dispatched: Boolean(process.env.ADMIN_WEBHOOK_URL),
+    });
+    if (leadErr) {
+      console.error("Supabase leads insert error:", leadErr);
+    }
+  }
 
   const stored = await appendSubmission("mock_exam_lead", record);
   if (!stored) {
@@ -163,5 +149,33 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, attemptId: null, webhookDispatched });
+  const emailQueued = emailEnabled();
+  const skipParentDuplicate = Boolean(/^[0-9a-fA-F-]{36}$/.test(existingAttemptId));
+  after(async () => {
+    try {
+      if (!skipParentDuplicate) {
+        const sent = await sendParentResultEmail(record);
+        console.log(`result email to parent: ${sent ? "sent" : "not sent"}`);
+      }
+      await sendAdminNotification("Lead ใหม่จากข้อสอบวัดระดับ (ฝากเบอร์ติดต่อกลับ)", {
+        ชื่อ: record.fullName,
+        อีเมล: record.email,
+        เบอร์โทร: record.phone,
+        LINE: record.lineId,
+        ชุดข้อสอบ: record.trackLabel,
+        คะแนน: `${record.scorePercent}% (${record.correctCount}/${record.totalQuestions})`,
+        กลุ่ม: record.tier,
+      });
+    } catch (err) {
+      console.error("post-lead email task failed:", err);
+    }
+  });
+
+  return NextResponse.json({
+    ok: true,
+    attemptId,
+    webhookDispatched,
+    emailQueued,
+    email: record.email,
+  });
 }

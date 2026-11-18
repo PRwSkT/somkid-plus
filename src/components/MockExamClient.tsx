@@ -288,6 +288,8 @@ export function MockExamClient({
   const [submittingLead, setSubmittingLead] = useState(false);
   const [leadError, setLeadError] = useState<string | null>(null);
   const [webhookStatus, setWebhookStatus] = useState<string | null>(null);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [autoEmailNote, setAutoEmailNote] = useState<string | null>(null);
   const [enrollCourse, setEnrollCourse] = useState<AcademicCourse | null>(null);
 
   const supabaseConfigured = isSupabaseConfigured();
@@ -634,13 +636,77 @@ export function MockExamClient({
     };
   }, [activeTrack, answers, courses]);
 
+  // Auto-save exam attempt & trigger AI email report once when an authenticated user reaches results
+  useEffect(() => {
+    if (step !== "results" || !authUser?.email || authUser.isDemo) return;
+    const attemptKey = `${activeTrack.id}:${results.correctCount}:${results.totalQuestions}:${authUser.email}`;
+    try {
+      const saved = sessionStorage.getItem("somkid_saved_attempt");
+      if (saved) {
+        const parsed = JSON.parse(saved) as { key?: string; attemptId?: string };
+        if (parsed.key === attemptKey) {
+          if (parsed.attemptId && !attemptId) {
+            setAttemptId(parsed.attemptId);
+          }
+          return;
+        }
+      }
+    } catch {
+      // ignore storage read error
+    }
+
+    let cancelled = false;
+    fetch("/api/exam-attempts", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        trackId: activeTrack.id,
+        trackLabel: activeTrack.title,
+        totalQuestions: results.totalQuestions,
+        correctCount: results.correctCount,
+        scorePercent: results.scorePercent,
+        tier: results.tier,
+        skillBreakdown: results.skillBreakdown,
+        recommendedCourseIds: results.recommendedCourses.map((c) => c.id),
+      }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.ok) return;
+        if (data.attemptId) setAttemptId(data.attemptId);
+        if (data.emailQueued && data.email) {
+          setAutoEmailNote(
+            `ระบบได้ส่งรายงานผลวิเคราะห์ (AI) ไปที่อีเมล ${data.email} แล้ว`
+          );
+        }
+        try {
+          sessionStorage.setItem(
+            "somkid_saved_attempt",
+            JSON.stringify({ key: attemptKey, attemptId: data.attemptId ?? null })
+          );
+        } catch {
+          // ignore
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [step, authUser, activeTrack.id, activeTrack.title, results, attemptId]);
+
   function startTrack(selectedId: string) {
     setTrackId(selectedId);
     setAnswers({});
     setCurrentIndex(0);
     setElapsedSeconds(0);
+    setAttemptId(null);
+    setAutoEmailNote(null);
+    setWebhookStatus(null);
     setStep("exam");
     try {
+      sessionStorage.removeItem("somkid_saved_attempt");
       sessionStorage.setItem(
         SESSION_KEY,
         JSON.stringify({
@@ -704,6 +770,7 @@ export function MockExamClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          attemptId,
           trackId: activeTrack.id,
           trackLabel: activeTrack.title,
           totalQuestions: results.totalQuestions,
@@ -726,9 +793,9 @@ export function MockExamClient({
       }
 
       setWebhookStatus(
-        data.webhookDispatched
-          ? "แจ้งเตือนทีมแนะแนวแบบ Real-Time สำเร็จ"
-          : "บันทึกผลสอบและแผนการเรียนในระบบเรียบร้อย"
+        data.emailQueued && data.email
+          ? `ระบบกำลังส่งผลวิเคราะห์ไปที่ ${data.email} กรุณาตรวจสอบกล่องจดหมายและโฟลเดอร์สแปมภายในไม่กี่นาที`
+          : "บันทึกผลสอบเรียบร้อย ทีมงานจะติดต่อกลับทางโทรศัพท์หรือ LINE"
       );
       setStep("results");
     } catch (err) {
@@ -794,7 +861,7 @@ export function MockExamClient({
                 : "border-[#D3DEE8] text-[#5A6F83]"
             }`}
           >
-            03 รับสิทธิ์ PDF
+            03 รับผลทางอีเมล
           </li>
           <li
             className={`px-2.5 py-1 border ${
@@ -1262,7 +1329,7 @@ export function MockExamClient({
 
           <div className="space-y-1">
             <h2 className="font-display text-2xl sm:text-3xl text-[#0F2A42]">
-              กรอกเบอร์ติดต่อเพื่อรับไฟล์ PDF วิเคราะห์ผลและคูปองส่วนลดค่าเรียน
+              กรอกเบอร์ติดต่อเพื่อรับผลวิเคราะห์ทางอีเมลและคำแนะนำจากทีมวิชาการ
             </h2>
             <p className="text-sm text-[#5A6F83]">
               ขั้นตอนสุดท้ายก่อนแสดงผลคะแนนรวม กราฟ Radar Chart 5 มิติ และคอร์สที่แนะนำเฉพาะบุคคล
@@ -1299,7 +1366,7 @@ export function MockExamClient({
                 htmlFor="enrich-line"
                 className="block text-sm font-medium text-[#0F2A42] mb-1.5"
               >
-                LINE ID (สำหรับส่งไฟล์ PDF วิเคราะห์ผลสอบฉบับเต็ม)
+                LINE ID (ไม่บังคับ สำหรับให้ทีมงานติดต่อกลับ)
               </label>
               <input
                 id="enrich-line"
@@ -1325,7 +1392,7 @@ export function MockExamClient({
                 htmlFor="enrich-pdpa"
                 className="text-xs text-[#2B4660] leading-relaxed"
               >
-                ยินยอมรับไฟล์ PDF วิเคราะห์ผลสอบ คูปองส่วนลดค่าเรียน และข้อมูลแนะนำหลักสูตรจากเจ้าหน้าที่ Somkid+ ตาม{" "}
+                ยินยอมให้ส่งผลวิเคราะห์และคำแนะนำหลักสูตรไปยังอีเมลที่ใช้เข้าสู่ระบบ และให้เจ้าหน้าที่ Somkid+ ติดต่อกลับ ตาม{" "}
                 <Link
                   href="/privacy-policy"
                   target="_blank"
@@ -1823,18 +1890,23 @@ export function MockExamClient({
             </section>
           )}
 
-          {/* Section 6: Consultation & Full PDF Request Card */}
+          {/* Section 6: Email report and consultation */}
           <section className="bg-[#F8FAFC] border-2 border-[#1E5079] p-6 sm:p-8 space-y-4 print:hidden">
             <div className="max-w-3xl space-y-1">
               <span className="font-mono-tech text-xs text-[#0B7490] font-semibold uppercase tracking-wider">
-                Section 6 · Academic Consultation & Delivery
+                Section 6 · Email Report & Consultation
               </span>
               <h3 className="font-display text-2xl text-[#0F2A42]">
-                รับไฟล์รายงานผลวิเคราะห์ 5 มิติฉบับสมบูรณ์ (PDF) และปรึกษาอาจารย์ Somkid+
+                ผลวิเคราะห์ทางอีเมลและคำปรึกษาจากอาจารย์ Somkid+
               </h3>
               <p className="text-sm text-[#5A6F83]">
-                กรอกเบอร์โทรศัพท์และ LINE ID เพื่อให้ทีมวิชาการจัดส่งรายงาน PDF ฉบับเต็ม พร้อมวิเคราะห์แผนการเรียนปิดจุดอ่อนเฉพาะบุคคล
+                ระบบสรุปผลวิเคราะห์ 5 มิติ พร้อมคำแนะนำและแผนฝึกที่จัดทำด้วย AI ส่งไปยังอีเมลของท่าน หากต้องการปรึกษาอาจารย์ กรอกเบอร์โทรศัพท์เพื่อให้ทีมงานติดต่อกลับ
               </p>
+              {autoEmailNote && !webhookStatus && (
+                <p className="text-xs font-medium text-[#188038] bg-[#e6f4ea] border-l-4 border-[#188038] px-3 py-2 mt-2">
+                  {autoEmailNote}
+                </p>
+              )}
             </div>
 
             {webhookStatus ? (
@@ -1860,7 +1932,7 @@ export function MockExamClient({
                 </div>
                 <div className="sm:col-span-4">
                   <label htmlFor="res-line" className="block text-xs font-semibold text-[#0F2A42] mb-1">
-                    LINE ID (สำหรับส่ง PDF)
+                    LINE ID (ไม่บังคับ)
                   </label>
                   <input
                     id="res-line"
@@ -1876,7 +1948,7 @@ export function MockExamClient({
                     disabled={submittingLead}
                     className="w-full bg-[#1E5079] hover:bg-[#143E61] disabled:opacity-60 text-white font-semibold py-2.5 px-4 text-sm transition-colors cursor-pointer"
                   >
-                    {submittingLead ? "กำลังส่ง..." : "ส่งรายงานเข้า LINE →"}
+                    {submittingLead ? "กำลังส่ง..." : "ขอให้ทีมงานติดต่อกลับ →"}
                   </button>
                 </div>
                 <div className="sm:col-span-12 flex items-center gap-2 pt-1 text-xs text-[#5A6F83]">

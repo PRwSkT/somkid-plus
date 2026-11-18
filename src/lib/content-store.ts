@@ -7,6 +7,7 @@ import {
   SEED_EXAM_TRACKS,
   type SiteContent,
 } from "@/data/somkid-data";
+import { getAdminSupabaseClient } from "@/lib/supabase/admin";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const CONTENT_FILE = path.join(DATA_DIR, "content.json");
@@ -51,28 +52,87 @@ export function defaultContent(): SiteContent {
 }
 
 export async function readContent(): Promise<SiteContent> {
+  const base = defaultContent();
+  let localData: Partial<SiteContent> = {};
+
   try {
     const raw = await fs.readFile(CONTENT_FILE, "utf-8");
-    const parsed = JSON.parse(raw) as Partial<SiteContent>;
-    const base = defaultContent();
-    return {
-      ...base,
-      ...parsed,
-      settings: { ...base.settings, ...(parsed.settings ?? {}) },
-    };
+    localData = JSON.parse(raw) as Partial<SiteContent>;
   } catch {
-    return defaultContent();
+    // Local file does not exist or unreadable; proceed with defaults
   }
+
+  const supabase = getAdminSupabaseClient();
+  let dbData: Partial<SiteContent> = {};
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("site_content")
+        .select("collection, data");
+      if (!error && Array.isArray(data)) {
+        for (const row of data) {
+          if (row.collection && row.data !== undefined) {
+            (dbData as Record<string, unknown>)[row.collection] = row.data;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch site_content from Supabase, using local fallback:", err);
+    }
+  }
+
+  return {
+    ...base,
+    ...localData,
+    ...dbData,
+    settings: {
+      ...base.settings,
+      ...(localData.settings ?? {}),
+      ...(dbData.settings ?? {}),
+    },
+  };
 }
 
 export async function writeCollection(
   name: CollectionName,
   value: unknown
 ): Promise<void> {
-  const current = await readContent();
-  const next = { ...current, [name]: value } as SiteContent;
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(CONTENT_FILE, JSON.stringify(next, null, 2), "utf-8");
+  const supabase = getAdminSupabaseClient();
+  let supabasePersisted = false;
+
+  if (supabase) {
+    const { error } = await supabase
+      .from("site_content")
+      .upsert(
+        {
+          collection: name,
+          data: value,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "collection" }
+      );
+
+    if (error) {
+      console.error(`Supabase writeCollection error for [${name}]:`, error);
+      throw new Error(`Failed to save to database: ${error.message}`);
+    }
+    supabasePersisted = true;
+  }
+
+  // Attempt local file write for local development environment (read-only on serverless)
+  try {
+    const current = await readContent();
+    const next = { ...current, [name]: value } as SiteContent;
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.writeFile(CONTENT_FILE, JSON.stringify(next, null, 2), "utf-8");
+  } catch (fsError) {
+    if (!supabasePersisted) {
+      console.error("Filesystem write failed and Supabase is not available:", fsError);
+      throw fsError;
+    }
+    // Expected on serverless runtimes with read-only root filesystems
+  }
 }
 
 export interface Submission {
@@ -83,6 +143,27 @@ export interface Submission {
 }
 
 export async function readSubmissions(): Promise<Submission[]> {
+  const supabase = getAdminSupabaseClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("site_submissions")
+        .select("id, type, data, created_at")
+        .order("created_at", { ascending: false });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return data.map((row) => ({
+          id: row.id,
+          type: row.type as Submission["type"],
+          createdAt: row.created_at,
+          data: (row.data ?? {}) as Record<string, unknown>,
+        }));
+      }
+    } catch (err) {
+      console.warn("Failed to fetch site_submissions from Supabase:", err);
+    }
+  }
+
   try {
     const raw = await fs.readFile(SUBMISSIONS_FILE, "utf-8");
     return JSON.parse(raw) as Submission[];
@@ -95,17 +176,34 @@ export async function appendSubmission(
   type: Submission["type"],
   data: Record<string, unknown>
 ): Promise<void> {
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+
+  const supabase = getAdminSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from("site_submissions").insert({
+        id,
+        type,
+        data,
+        created_at: createdAt,
+      });
+    } catch (err) {
+      console.error("Supabase appendSubmission error:", err);
+    }
+  }
+
   try {
     const list = await readSubmissions();
     list.unshift({
-      id: crypto.randomUUID(),
+      id,
       type,
-      createdAt: new Date().toISOString(),
+      createdAt,
       data,
     });
     await fs.mkdir(DATA_DIR, { recursive: true });
     await fs.writeFile(SUBMISSIONS_FILE, JSON.stringify(list, null, 2), "utf-8");
   } catch {
-    // read-only filesystems (serverless) cannot persist; Supabase/webhook remain
+    // Read-only filesystem on serverless; database persistence handles it
   }
 }

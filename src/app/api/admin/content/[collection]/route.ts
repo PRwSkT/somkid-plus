@@ -48,9 +48,10 @@ export async function PUT(
   }
   try {
     await writeCollection(collection, body.data);
-  } catch {
+  } catch (err) {
+    console.error(`Failed to write collection [${collection}]:`, err);
     return NextResponse.json(
-      { error: "บันทึกไม่สำเร็จ: เซิร์ฟเวอร์เขียนไฟล์ไม่ได้" },
+      { error: "บันทึกไม่สำเร็จ: เกิดข้อผิดพลาดในการบันทึกข้อมูล" },
       { status: 500 }
     );
   }
